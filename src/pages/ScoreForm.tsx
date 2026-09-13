@@ -54,9 +54,20 @@ export default function ScoreForm() {
       return
     }
     const rid = roundId
+    // Guards against a slower request for a round the user has since
+    // navigated away from resolving after — and silently overwriting —
+    // the currently-viewed round's freshly-loaded data with stale scores.
+    let cancelled = false
+    setLoading(true)
+    setRound(null)
+    setStandard(null)
+    setScores([])
+    setTeamScores([])
+    setParticipants([])
+    setError(null)
     async function load() {
-      setLoading(true)
       const { data: roundRow, error: roundErr } = await supabase.from('assessment_rounds').select('*').eq('id', rid).single()
+      if (cancelled) return
       if (roundErr || !roundRow) {
         setError('ไม่พบรอบการประเมิน')
         setLoading(false)
@@ -67,17 +78,25 @@ export default function ScoreForm() {
         loadStandardByVersionId(round.standard_version_id),
         supabase.from('participants').select('*').eq('round_id', rid).order('joined_at'),
       ])
+      if (cancelled) return
       setParticipants((parts.data as Participant[]) ?? [])
       if (round.scoring_mode === 'collaborative') {
-        setTeamScores(await fetchTeamScoresForRound(rid))
+        const teamRows = await fetchTeamScoresForRound(rid)
+        if (cancelled) return
+        setTeamScores(teamRows)
       } else {
-        setScores(await fetchScoresForParticipant(rid, session!.participantId))
+        const rows = await fetchScoresForParticipant(rid, session!.participantId)
+        if (cancelled) return
+        setScores(rows)
       }
       setRound(round)
       setStandard(std)
       setLoading(false)
     }
     load()
+    return () => {
+      cancelled = true
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundId])
 

@@ -35,7 +35,18 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
 @media print {
+  /* The on-screen accessibility bump above is meant for reading on a
+     display, not for print layout — printed reports use their own
+     explicit (smaller) sizing so the summary report fits one A4 page. */
+  :root {
+    font-size: 100%;
+  }
   body {
     background: #fff;
     font-family: 'TH Sarabun PSK', 'Sarabun', sans-serif;

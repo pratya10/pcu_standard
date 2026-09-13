@@ -19,9 +19,19 @@ export default function LiveDashboard() {
   useEffect(() => {
     if (!roundId) return
     const rid = roundId
+    // Guards against a slower request for a round the user has since
+    // navigated away from resolving after — and silently overwriting —
+    // the currently-viewed round's freshly-loaded data with stale scores.
+    let cancelled = false
+    setLoading(true)
+    setRound(null)
+    setStandard(null)
+    setScores([])
+    setFacility(null)
+    setParticipants([])
     async function load() {
-      setLoading(true)
       const { data: roundRow } = await supabase.from('assessment_rounds').select('*').eq('id', rid).single()
+      if (cancelled) return
       if (!roundRow) {
         setLoading(false)
         return
@@ -33,6 +43,7 @@ export default function LiveDashboard() {
         supabase.from('facilities').select('*').eq('id', round.facility_id).single(),
         supabase.from('participants').select('*').eq('round_id', rid).order('joined_at'),
       ])
+      if (cancelled) return
       setRound(round)
       setStandard(std)
       setScores(sc)
@@ -41,6 +52,9 @@ export default function LiveDashboard() {
       setLoading(false)
     }
     load()
+    return () => {
+      cancelled = true
+    }
   }, [roundId])
 
   useEffect(() => {

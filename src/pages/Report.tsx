@@ -24,13 +24,26 @@ export default function Report() {
   const [auditLog, setAuditLog] = useState<TeamScoreAudit[]>([])
   const [loading, setLoading] = useState(true)
   const [printMode, setPrintMode] = useState<'summary' | 'detailed'>('summary')
+  const [showAuditLog, setShowAuditLog] = useState(false)
 
   useEffect(() => {
     if (!roundId) return
     const rid = roundId
+    // Guards against a slower request for a round the user has since
+    // navigated away from resolving after — and silently overwriting —
+    // the currently-viewed round's freshly-loaded data with stale scores.
+    let cancelled = false
+    setLoading(true)
+    setRound(null)
+    setStandard(null)
+    setScores([])
+    setFacility(null)
+    setParticipants([])
+    setPhotos([])
+    setAuditLog([])
     async function load() {
-      setLoading(true)
       const { data: roundRow } = await supabase.from('assessment_rounds').select('*').eq('id', rid).single()
+      if (cancelled) return
       if (!roundRow) {
         setLoading(false)
         return
@@ -44,6 +57,7 @@ export default function Report() {
         listRoundPhotos(rid),
         round.scoring_mode === 'collaborative' ? fetchTeamScoreAuditForRound(rid) : Promise.resolve([]),
       ])
+      if (cancelled) return
       setRound(round)
       setStandard(std)
       setScores(sc)
@@ -54,6 +68,9 @@ export default function Report() {
       setLoading(false)
     }
     load()
+    return () => {
+      cancelled = true
+    }
   }, [roundId])
 
   useEffect(() => {
@@ -121,7 +138,6 @@ export default function Report() {
         mustFailCount: flatTopics.filter((t) => aggregates.get(t.id)?.mustPassFinal === false).length,
         includeComments,
         photosByTopic: includeComments ? photosByTopic : undefined,
-        auditLog: includeComments ? auditLog : undefined,
       })
       const suffix = includeComments ? 'with-comments' : 'no-comments'
       downloadBlob(blob, `pcu-report-${round.join_code}-${suffix}.docx`)
@@ -166,7 +182,11 @@ export default function Report() {
   const overallPass = mustFailTopics.length === 0
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-8 print:px-0 print:py-0">
+    <div
+      className={`mx-auto max-w-3xl px-6 py-8 print:px-0 print:py-0 ${
+        printMode === 'summary' ? 'print:rounded-lg print:border-[3px] print:border-double print:border-amber-800 print:p-6' : ''
+      }`}
+    >
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-2">
           <Link to={`/round/${roundId}/score`} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600">
@@ -213,15 +233,27 @@ export default function Report() {
             </button>
           </div>
         </div>
+
+        {round.scoring_mode === 'collaborative' && auditLog.length > 0 && (
+          <div className="rounded-xl border border-slate-200 p-3">
+            <p className="mb-2 text-xs font-semibold text-slate-400">ประวัติการแก้ไข (ทีมคณะกรรมช่วยกัน)</p>
+            <button
+              onClick={() => setShowAuditLog((v) => !v)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600"
+            >
+              {showAuditLog ? 'ซ่อนประวัติการแก้ไข' : 'ดูประวัติการแก้ไข'}
+            </button>
+          </div>
+        )}
       </div>
 
-      <div className="mb-6 text-center">
-        <BrandLogo className="mx-auto mb-3 h-[83px] w-auto object-contain" />
-        <h1 className="text-xl font-bold text-slate-800">รายงานผลการประเมินมาตรฐานหน่วยบริการปฐมภูมิ</h1>
-        <p className="text-sm text-slate-500">{standard.standardVersion.name}</p>
+      <div className="mb-6 text-center print:mb-2">
+        <BrandLogo className="mx-auto mb-3 h-[83px] w-auto object-contain print:mb-1 print:h-12" />
+        <h1 className="text-xl font-bold text-slate-800 print:text-base">รายงานผลการประเมินมาตรฐานหน่วยบริการปฐมภูมิ</h1>
+        <p className="text-sm text-slate-500 print:text-[11px]">{standard.standardVersion.name}</p>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-x-6 gap-y-1 rounded-xl border border-slate-200 p-4 text-sm">
+      <div className="mb-6 grid grid-cols-2 gap-x-6 gap-y-1 rounded-xl border border-slate-200 p-4 text-sm print:mb-2 print:gap-y-0 print:p-2 print:text-[11px]">
         <p>
           <span className="text-slate-500">หน่วยบริการ: </span>
           {facility?.name}
@@ -250,16 +282,16 @@ export default function Report() {
           const catTotal = catTopics.reduce((sum, t) => sum + (aggregates.get(t.id)?.avgScore ?? 0), 0)
           const catPass = catTopics.every((t) => aggregates.get(t.id)?.mustPassFinal !== false)
           return (
-            <div key={cat.id} className="mb-6 break-inside-avoid">
-              <h2 className="mb-2 text-sm font-bold text-slate-800">
+            <div key={cat.id} className="mb-6 break-inside-avoid print:mb-1.5">
+              <h2 className="mb-2 text-sm font-bold text-slate-800 print:mb-0.5 print:text-[11px]">
                 หมวดที่ {cat.code} · {cat.name_th}
               </h2>
-              <table className="w-full border-collapse text-sm">
+              <table className="w-full border-collapse text-sm print:text-[10px]">
                 <thead>
-                  <tr className="border-b border-slate-300 text-left text-xs text-slate-500">
-                    <th className="py-1 pr-2">หัวข้อ</th>
-                    <th className="py-1 pr-2 text-center">The Must</th>
-                    <th className="py-1 pr-2 text-center">คะแนน (0-2)</th>
+                  <tr className="border-b border-slate-300 text-left text-xs text-slate-500 print:text-[9px]">
+                    <th className="py-1 pr-2 print:py-0.5">หัวข้อ</th>
+                    <th className="py-1 pr-2 text-center print:py-0.5">The Must</th>
+                    <th className="py-1 pr-2 text-center print:py-0.5">คะแนน (0-2)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -267,20 +299,20 @@ export default function Report() {
                     const agg = aggregates.get(t.id)
                     return (
                       <tr key={t.id} className="border-b border-slate-100">
-                        <td className="py-1 pr-2">
-                          <span className="font-mono text-xs text-slate-400">{t.code}</span> {t.name_th}
+                        <td className="py-1 pr-2 print:py-0.5">
+                          <span className="font-mono text-xs text-slate-400 print:text-[9px]">{t.code}</span> {t.name_th}
                         </td>
-                        <td className="py-1 pr-2 text-center">
+                        <td className="py-1 pr-2 text-center print:py-0.5">
                           {agg?.mustPassFinal === null || agg?.mustPassFinal === undefined ? '-' : agg.mustPassFinal ? 'ผ่าน' : 'ไม่ผ่าน'}
                         </td>
-                        <td className="py-1 pr-2 text-center font-semibold">{formatAvg(agg?.avgScore ?? null)}</td>
+                        <td className="py-1 pr-2 text-center font-semibold print:py-0.5">{formatAvg(agg?.avgScore ?? null)}</td>
                       </tr>
                     )
                   })}
                   <tr className="font-semibold text-slate-800">
-                    <td className="py-1 pr-2">รวม</td>
-                    <td className="py-1 pr-2 text-center">{catPass ? 'ผ่าน' : 'ไม่ผ่าน'}</td>
-                    <td className="py-1 pr-2 text-center">{catTotal.toFixed(1)}</td>
+                    <td className="py-1 pr-2 print:py-0.5">รวม</td>
+                    <td className="py-1 pr-2 text-center print:py-0.5">{catPass ? 'ผ่าน' : 'ไม่ผ่าน'}</td>
+                    <td className="py-1 pr-2 text-center print:py-0.5">{catTotal.toFixed(1)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -345,8 +377,8 @@ export default function Report() {
         </div>
       )}
 
-      {printMode === 'detailed' && auditLog.length > 0 && (
-        <div className="mb-6 break-inside-avoid">
+      {showAuditLog && auditLog.length > 0 && (
+        <div className="no-print mb-6 rounded-xl border border-slate-200 p-4">
           <h2 className="mb-2 text-sm font-bold text-slate-800">ประวัติการแก้ไขคะแนน (โหมดทีมคณะกรรมช่วยกัน)</h2>
           <ul className="list-disc pl-5 text-sm text-slate-600">
             {auditLog.map((a) => {
@@ -365,21 +397,21 @@ export default function Report() {
         </div>
       )}
 
-      <div className="mb-8 rounded-xl border-2 border-slate-800 p-4 text-center">
-        <p className="text-sm text-slate-500">สรุปผลการประเมินภาพรวม</p>
-        <p className="text-3xl font-bold text-slate-800">{grandTotal.toFixed(1)} คะแนน</p>
-        <p className={`text-sm font-semibold ${overallPass ? 'text-emerald-600' : 'text-red-600'}`}>
+      <div className="mb-8 rounded-xl border-2 border-slate-800 p-4 text-center print:mb-2 print:border print:border-amber-800 print:p-2">
+        <p className="text-sm text-slate-500 print:text-[10px]">สรุปผลการประเมินภาพรวม</p>
+        <p className="text-3xl font-bold text-slate-800 print:text-lg">{grandTotal.toFixed(1)} คะแนน</p>
+        <p className={`text-sm font-semibold print:text-[10px] ${overallPass ? 'text-emerald-600' : 'text-red-600'}`}>
           {overallPass ? 'ผ่านเกณฑ์ The Must ครบทุกหัวข้อ' : `ไม่ผ่านเกณฑ์ The Must จำนวน ${mustFailTopics.length} หัวข้อ`}
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-8 pt-8 text-center text-sm">
+      <div className="grid grid-cols-2 gap-8 pt-8 text-center text-sm print:gap-4 print:pt-3 print:text-[10px]">
         <div>
-          <p className="mb-8">ลงชื่อ .............................................</p>
+          <p className="mb-8 print:mb-4">ลงชื่อ .............................................</p>
           <p>ประธานคณะกรรมการประเมิน</p>
         </div>
         <div>
-          <p className="mb-8">ลงชื่อ .............................................</p>
+          <p className="mb-8 print:mb-4">ลงชื่อ .............................................</p>
           <p>ผู้อำนวยการหน่วยบริการ</p>
         </div>
       </div>

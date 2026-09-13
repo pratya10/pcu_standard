@@ -15,8 +15,7 @@ import { getLogoUrl } from './branding'
 import { getTopicPhotoUrl } from './topicPhotos'
 import { formatAvg, type TopicAggregate } from './aggregate'
 import { formatThaiDate } from './thaiDate'
-import type { AssessmentRound, Facility, FullStandard, Participant, TeamScoreAudit, Topic, TopicEvidenceItem, TopicPhoto, TopicScoreItem } from '../types'
-import { formatThaiDateTime } from './thaiDate'
+import type { AssessmentRound, Facility, FullStandard, Participant, Topic, TopicEvidenceItem, TopicPhoto, TopicScoreItem } from '../types'
 
 type TopicWithEvidence = Topic & { evidence: TopicEvidenceItem[]; scoreItems: TopicScoreItem[] }
 
@@ -30,7 +29,6 @@ export type ReportDocxInput = {
   mustFailCount: number
   includeComments?: boolean
   photosByTopic?: Map<string, TopicPhoto[]>
-  auditLog?: TeamScoreAudit[]
 }
 
 // Caps how many photos get embedded per topic / for the whole document, so a
@@ -173,7 +171,7 @@ async function fetchTopicPhotoAssets(
 }
 
 export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> {
-  const { round, facility, standard, aggregates, evaluators, grandTotal, mustFailCount, includeComments, photosByTopic, auditLog } = input
+  const { round, facility, standard, aggregates, evaluators, grandTotal, mustFailCount, includeComments, photosByTopic } = input
   const evaluatorNameById = new Map(evaluators.map((e) => [e.id, e.name]))
   const imagesLeftTotal = { count: MAX_IMAGES_TOTAL }
   const logo = await tryFetchImage(getLogoUrl())
@@ -271,36 +269,6 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
     )
 
     children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows }), new Paragraph({ text: '' }))
-  }
-
-  if (includeComments && auditLog && auditLog.length > 0) {
-    const topicById = new Map(standard.categories.flatMap((cat) => categoryTopics(cat).map((t) => [t.id, t])))
-    const itemTextById = new Map(standard.categories.flatMap((cat) => categoryTopics(cat).flatMap((t) => t.scoreItems.map((it) => [it.id, it.item_text]))))
-    children.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_2,
-        children: [new TextRun({ text: 'ประวัติการแก้ไขคะแนน (โหมดทีมคณะกรรมช่วยกัน)', bold: true })],
-      }),
-    )
-    for (const a of auditLog) {
-      const t = topicById.get(a.topic_id)
-      const fieldLabel = a.field === 'score' ? 'คะแนน' : a.field === 'must_pass' ? 'ผล The Must' : `ข้อย่อย "${itemTextById.get(a.item_id ?? '') ?? ''}"`
-      const describe = (v: unknown) =>
-        a.field === 'must_pass' ? (v ? 'ผ่าน' : 'ไม่ผ่าน') : a.field === 'item_checked' ? (v ? 'มี' : 'ไม่มี') : String(v)
-      const name = evaluatorNameById.get(a.participant_id ?? '') ?? 'กรรมการ'
-      children.push(
-        new Paragraph({
-          bullet: { level: 0 },
-          children: [
-            new TextRun({
-              text: `${t?.code ?? ''} ${t?.name_th ?? ''} — ${fieldLabel}: เปลี่ยนจาก "${describe(a.old_value)}" เป็น "${describe(a.new_value)}" โดย ${name} เมื่อ ${formatThaiDateTime(a.created_at)}`,
-              size: 20,
-            }),
-          ],
-        }),
-      )
-    }
-    children.push(new Paragraph({ text: '' }))
   }
 
   const overallPass = mustFailCount === 0
