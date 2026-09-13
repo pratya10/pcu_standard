@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import type { AssessmentRound, Facility } from '../types'
-import AdminNav from '../components/AdminNav'
+import AdminLayout from '../components/AdminLayout'
 import { formatThaiDate } from '../lib/thaiDate'
 
 type RoundRow = AssessmentRound & { facility?: Facility }
@@ -44,9 +44,7 @@ export default function AdminDashboard() {
   }, [])
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <AdminNav title="รอบการประเมิน" />
-
+    <AdminLayout title="รอบการประเมิน">
       <div className="mb-4 flex justify-end">
         <Link to="/admin/rounds/new" className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">
           + สร้างรอบการประเมินใหม่
@@ -81,6 +79,6 @@ export default function AdminDashboard() {
           ))}
         </div>
       )}
-    </div>
+    </AdminLayout>
   )
 }

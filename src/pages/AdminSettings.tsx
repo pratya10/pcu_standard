@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import AdminNav from '../components/AdminNav'
+import AdminLayout from '../components/AdminLayout'
 import { deleteLogo, getLogoUrl, uploadLogo } from '../lib/branding'
 import { getMyAdminProfile, saveMyAdminProfile } from '../lib/adminProfile'
 import { useConfirm } from '../components/ConfirmProvider'
@@ -84,9 +84,7 @@ export default function AdminSettings() {
   }
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-8">
-      <AdminNav title="ตั้งค่า" />
-
+    <AdminLayout title="ตั้งค่า" maxWidth="max-w-xl">
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5">
         <p className="mb-3 text-sm font-medium text-slate-600">ข้อมูลผู้ใช้งาน (แสดงแทนคำว่า "ผู้ดูแล" ในระบบ)</p>
         {profileLoading ? (
@@ -164,6 +162,6 @@ export default function AdminSettings() {
         </div>
         <p className="mt-3 text-xs text-slate-400">รองรับไฟล์ PNG, JPG, SVG, WebP — แนะนำพื้นหลังโปร่งใส (PNG/SVG)</p>
       </div>
-    </div>
+    </AdminLayout>
   )
 }

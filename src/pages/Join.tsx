@@ -121,22 +121,54 @@ export default function Join() {
         }
       }
 
-      const deviceKey = randomDeviceKey()
-      const { data: participant, error: pErr } = await supabase
+      // Resume an existing participant row instead of creating a duplicate
+      // if this name already joined this round (e.g. they accidentally left
+      // — closed the tab, hit back, or exited — and are rejoining). This
+      // keeps their previously-entered scores intact.
+      const trimmedName = name.trim()
+      const { data: existing, error: existingErr } = await supabase
         .from('participants')
-        .insert({
-          round_id: round.id,
-          name: name.trim(),
-          role,
-          device_key: deviceKey,
-          civil_service_level: civilServiceLevel.trim() || null,
-          affiliation: affiliation.trim() || null,
-        })
-        .select()
-        .single()
-      if (pErr) throw pErr
+        .select('*')
+        .eq('round_id', round.id)
+        .eq('role', role)
+        .ilike('name', trimmedName)
+        .maybeSingle()
+      if (existingErr) throw existingErr
 
-      saveParticipantSession({ participantId: participant.id, roundId: round.id, name: name.trim(), role })
+      const deviceKey = randomDeviceKey()
+      let participant
+      if (existing) {
+        const { data: updated, error: updErr } = await supabase
+          .from('participants')
+          .update({
+            name: trimmedName,
+            device_key: deviceKey,
+            civil_service_level: civilServiceLevel.trim() || null,
+            affiliation: affiliation.trim() || null,
+          })
+          .eq('id', existing.id)
+          .select()
+          .single()
+        if (updErr) throw updErr
+        participant = updated
+      } else {
+        const { data: created, error: pErr } = await supabase
+          .from('participants')
+          .insert({
+            round_id: round.id,
+            name: trimmedName,
+            role,
+            device_key: deviceKey,
+            civil_service_level: civilServiceLevel.trim() || null,
+            affiliation: affiliation.trim() || null,
+          })
+          .select()
+          .single()
+        if (pErr) throw pErr
+        participant = created
+      }
+
+      saveParticipantSession({ participantId: participant.id, roundId: round.id, name: trimmedName, role })
 
       navigate(role === 'viewer' ? `/round/${round.id}/live` : `/round/${round.id}/score`)
     } catch (err) {

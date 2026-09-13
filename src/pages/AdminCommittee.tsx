@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import type { CommitteeMember } from '../types'
-import AdminNav from '../components/AdminNav'
+import AdminLayout from '../components/AdminLayout'
 import { useConfirm } from '../components/ConfirmProvider'
 
 const emptyForm = {
@@ -93,9 +93,8 @@ export default function AdminCommittee() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <AdminNav title="ทะเบียนคณะกรรมการ" />
-      <p className="mb-4 -mt-4 text-sm text-slate-500">
+    <AdminLayout title="ทะเบียนคณะกรรมการ">
+      <p className="mb-4 text-sm text-slate-500">
         ข้อมูลอ้างอิงสำหรับใช้ประกอบการประเมิน (ระดับ/ตำแหน่ง สังกัด) แยกจากรายชื่อผู้เข้าร่วมในแต่ละรอบที่เก็บตอนกดเข้าร่วมด้วยรหัส
       </p>
 
@@ -210,6 +209,6 @@ export default function AdminCommittee() {
           </table>
         </div>
       )}
-    </div>
+    </AdminLayout>
   )
 }

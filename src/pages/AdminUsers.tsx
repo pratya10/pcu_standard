@@ -4,7 +4,7 @@ import type { AdminAllowlistEntry } from '../types'
 import { addAdminUser, listAdminUsers, removeAdminUser } from '../lib/adminUsers'
 import { useConfirm } from '../components/ConfirmProvider'
 import { formatThaiDate } from '../lib/thaiDate'
-import AdminNav from '../components/AdminNav'
+import AdminLayout from '../components/AdminLayout'
 
 export default function AdminUsers() {
   const confirm = useConfirm()
@@ -68,9 +68,7 @@ export default function AdminUsers() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
-      <AdminNav title="จัดการผู้ดูแลระบบ" />
-
+    <AdminLayout title="จัดการผู้ดูแลระบบ" maxWidth="max-w-2xl">
       <form onSubmit={handleAdd} className="mb-6 flex gap-2 rounded-xl border border-slate-200 bg-white p-4">
         <input
           type="email"
@@ -113,6 +111,6 @@ export default function AdminUsers() {
       <p className="mt-3 text-xs text-slate-400">
         ผู้ที่มีอีเมลอยู่ในรายชื่อนี้เท่านั้นที่จะเข้าสู่ระบบผู้ดูแลด้วย Google ได้ ผู้ใช้ต้องล็อกอินด้วยบัญชี Google ที่ตรงกับอีเมลนี้
       </p>
-    </div>
+    </AdminLayout>
   )
 }

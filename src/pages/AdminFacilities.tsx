@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import type { Facility } from '../types'
-import AdminNav from '../components/AdminNav'
+import AdminLayout from '../components/AdminLayout'
 import { useConfirm } from '../components/ConfirmProvider'
 
 const emptyForm = {
@@ -98,8 +98,7 @@ export default function AdminFacilities() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <AdminNav title="จัดการหน่วยบริการ (PCU)" />
+    <AdminLayout title="จัดการหน่วยบริการ (PCU)">
 
       <form onSubmit={handleSubmit} className="mb-8 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4">
         {editingId && (
@@ -232,6 +231,6 @@ export default function AdminFacilities() {
           </table>
         </div>
       )}
-    </div>
+    </AdminLayout>
   )
 }

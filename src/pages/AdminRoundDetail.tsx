@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabaseClient'
 import type { AssessmentRound, Facility, Participant } from '../types'
-import AdminNav from '../components/AdminNav'
+import AdminLayout from '../components/AdminLayout'
 import { formatThaiDate } from '../lib/thaiDate'
 import { useConfirm } from '../components/ConfirmProvider'
 
@@ -133,9 +133,7 @@ export default function AdminRoundDetail() {
   if (!round) return <div className="flex min-h-screen items-center justify-center text-red-600">ไม่พบรอบการประเมิน</div>
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <AdminNav title={round.name} />
-
+    <AdminLayout title={round.name}>
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white p-5">
           <div className="mb-3 flex items-start justify-between">
@@ -325,6 +323,6 @@ export default function AdminRoundDetail() {
         ))}
         {participants.length === 0 && <p className="px-4 py-6 text-center text-sm text-slate-400">ยังไม่มีผู้เข้าร่วม</p>}
       </div>
-    </div>
+    </AdminLayout>
   )
 }

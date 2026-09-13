@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import type { Facility, StandardVersion } from '../types'
 import { randomJoinCode } from '../lib/participantSession'
-import AdminNav from '../components/AdminNav'
+import AdminLayout from '../components/AdminLayout'
 
 export default function AdminNewRound() {
   const navigate = useNavigate()
@@ -101,8 +101,7 @@ export default function AdminNewRound() {
   }
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-8">
-      <AdminNav title="สร้างรอบการประเมินใหม่" />
+    <AdminLayout title="สร้างรอบการประเมินใหม่" maxWidth="max-w-xl">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5">
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-600">หน่วยบริการ</label>
@@ -182,6 +181,6 @@ export default function AdminNewRound() {
           <p className="text-xs text-amber-600">ยังไม่มีหน่วยบริการในระบบ กรุณาเพิ่มที่หน้า "หน่วยบริการ" ก่อน</p>
         )}
       </form>
-    </div>
+    </AdminLayout>
   )
 }
