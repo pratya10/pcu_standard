@@ -6,8 +6,8 @@ export default function Home() {
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-6 px-6 py-12">
       <div className="text-center">
         <BrandLogo className="mx-auto mb-4 h-[104px] w-auto object-contain" />
-        <h1 className="text-2xl font-bold text-slate-800">ระบบประเมินมาตรฐาน PCU</h1>
-        <p className="mt-2 text-sm text-slate-500">มาตรฐานหน่วยบริการปฐมภูมิ ฉบับก้าวหน้า ปี 2571–2573</p>
+        <h1 className="text-2xl font-bold text-slate-800">ระบบประเมินมาตรฐาน PCU/NPCU</h1>
+        <p className="mt-2 text-sm text-slate-500">ฉบับก้าวหน้า ปี 2571–2573</p>
       </div>
 
       <Link
