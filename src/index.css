@@ -2,7 +2,7 @@
 
 :root {
   color-scheme: light;
-  font-family: 'Noto Sans Thai Looped', 'Noto Sans Thai', system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Noto Sans Thai', system-ui, 'Segoe UI', Roboto, sans-serif;
 }
 
 html, body, #root {
@@ -18,6 +18,7 @@ body {
 @media print {
   body {
     background: #fff;
+    font-family: 'TH Sarabun PSK', 'Sarabun', sans-serif;
   }
   .no-print {
     display: none !important;

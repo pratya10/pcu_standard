@@ -241,6 +241,11 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
   )
 
   const doc = new Document({
+    styles: {
+      default: {
+        document: { run: { font: 'TH Sarabun PSK' } },
+      },
+    },
     sections: [{ children }],
   })
 
