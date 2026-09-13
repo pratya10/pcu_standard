@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import type { AssessmentRound, Facility } from '../types'
 import AdminNav from '../components/AdminNav'
+import { formatThaiDate } from '../lib/thaiDate'
 
 type RoundRow = AssessmentRound & { facility?: Facility }
 
@@ -69,7 +70,7 @@ export default function AdminDashboard() {
               <div>
                 <p className="font-semibold text-slate-800">{r.name}</p>
                 <p className="text-sm text-slate-500">
-                  {r.facility?.name} · {r.survey_date ?? 'ยังไม่กำหนดวัน'}
+                  {r.facility?.name} · {formatThaiDate(r.survey_date, 'ยังไม่กำหนดวัน')}
                 </p>
               </div>
               <div className="flex items-center gap-3">

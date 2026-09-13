@@ -76,6 +76,7 @@ export type AssessmentRound = {
   survey_date: string | null
   join_code: string
   status: 'draft' | 'in_progress' | 'completed'
+  is_public: boolean
   created_by: string | null
   created_at: string
   completed_at: string | null
@@ -89,7 +90,35 @@ export type Participant = {
   name: string
   role: ParticipantRole
   device_key: string
+  civil_service_level: string | null
+  affiliation: string | null
   joined_at: string
+}
+
+export type AdminProfile = {
+  user_id: string
+  first_name: string | null
+  last_name: string | null
+  profession: string | null
+  updated_at: string
+}
+
+export type AdminAllowlistEntry = {
+  email: string
+  added_by: string | null
+  created_at: string
+}
+
+export type CommitteeMember = {
+  id: string
+  name: string
+  civil_service_level: string | null
+  affiliation: string | null
+  position: string | null
+  phone: string | null
+  email: string | null
+  note: string | null
+  created_at: string
 }
 
 export type ScoreValue = 0 | 1 | 2

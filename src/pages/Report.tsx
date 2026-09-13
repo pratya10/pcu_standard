@@ -7,6 +7,7 @@ import { aggregateAll, formatAvg } from '../lib/aggregate'
 import type { AssessmentRound, FullStandard, Facility, Participant, Score } from '../types'
 import BrandLogo from '../components/BrandLogo'
 import { downloadBlob, generateReportDocx } from '../lib/docxExport'
+import { formatThaiDate } from '../lib/thaiDate'
 
 export default function Report() {
   const { roundId } = useParams<{ roundId: string }>()
@@ -141,7 +142,7 @@ export default function Report() {
         </p>
         <p>
           <span className="text-slate-500">วันที่ประเมิน: </span>
-          {round.survey_date ?? '-'}
+          {formatThaiDate(round.survey_date)}
         </p>
         <p className="col-span-2">
           <span className="text-slate-500">คณะกรรมการผู้ประเมิน: </span>

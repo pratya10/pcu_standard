@@ -18,6 +18,13 @@ export default function Home() {
       </Link>
 
       <Link
+        to="/history"
+        className="rounded-2xl border border-sky-300 bg-white px-6 py-2 text-center text-sm font-medium text-sky-700 active:scale-[0.98]"
+      >
+        ประวัติการประเมิน
+      </Link>
+
+      <Link
         to="/admin/login"
         className="rounded-2xl border border-slate-300 bg-white px-6 py-2 text-center text-sm font-medium text-slate-600 active:scale-[0.98]"
       >

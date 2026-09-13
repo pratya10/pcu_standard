@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import type { Facility } from '../types'
 import AdminNav from '../components/AdminNav'
+import { useConfirm } from '../components/ConfirmProvider'
 
 const emptyForm = {
   code: '',
@@ -16,6 +17,7 @@ const emptyForm = {
 }
 
 export default function AdminFacilities() {
+  const confirm = useConfirm()
   const [facilities, setFacilities] = useState<Facility[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState(emptyForm)
@@ -80,7 +82,8 @@ export default function AdminFacilities() {
   }
 
   async function handleDelete(f: Facility) {
-    if (!confirm(`ลบหน่วยบริการ "${f.name}" ออกจากระบบ?`)) return
+    const ok = await confirm({ title: 'ลบหน่วยบริการ', message: `ลบหน่วยบริการ "${f.name}" ออกจากระบบ?`, confirmLabel: 'ลบ' })
+    if (!ok) return
     const { error } = await supabase.from('facilities').delete().eq('id', f.id)
     if (error) {
       alert(
@@ -95,7 +98,7 @@ export default function AdminFacilities() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
+    <div className="mx-auto max-w-4xl px-4 py-8">
       <AdminNav title="จัดการหน่วยบริการ (PCU)" />
 
       <form onSubmit={handleSubmit} className="mb-8 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4">

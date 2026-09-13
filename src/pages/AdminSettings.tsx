@@ -1,13 +1,49 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import AdminNav from '../components/AdminNav'
 import { deleteLogo, getLogoUrl, uploadLogo } from '../lib/branding'
+import { getMyAdminProfile, saveMyAdminProfile } from '../lib/adminProfile'
+import { useConfirm } from '../components/ConfirmProvider'
 
 export default function AdminSettings() {
+  const confirm = useConfirm()
   const [logoUrl, setLogoUrl] = useState(() => getLogoUrl())
   const [hasLogo, setHasLogo] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [profession, setProfession] = useState('')
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [profileSaved, setProfileSaved] = useState(false)
+  const [profileLoading, setProfileLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      const profile = await getMyAdminProfile()
+      if (profile) {
+        setFirstName(profile.first_name ?? '')
+        setLastName(profile.last_name ?? '')
+        setProfession(profile.profession ?? '')
+      }
+      setProfileLoading(false)
+    }
+    load()
+  }, [])
+
+  async function handleSaveProfile(e: React.FormEvent) {
+    e.preventDefault()
+    setProfileSaving(true)
+    setProfileSaved(false)
+    try {
+      await saveMyAdminProfile({ firstName, lastName, profession })
+      setProfileSaved(true)
+      setTimeout(() => setProfileSaved(false), 2000)
+    } finally {
+      setProfileSaving(false)
+    }
+  }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -28,7 +64,12 @@ export default function AdminSettings() {
   }
 
   async function handleDelete() {
-    if (!confirm('ลบโลโก้ปัจจุบัน? หน้าแรกและรายงานจะไม่แสดงโลโก้จนกว่าจะอัปโหลดใหม่')) return
+    const ok = await confirm({
+      title: 'ลบโลโก้',
+      message: 'ลบโลโก้ปัจจุบัน? หน้าแรกและรายงานจะไม่แสดงโลโก้จนกว่าจะอัปโหลดใหม่',
+      confirmLabel: 'ลบ',
+    })
+    if (!ok) return
     setError(null)
     setSaving(true)
     try {
@@ -44,7 +85,42 @@ export default function AdminSettings() {
 
   return (
     <div className="mx-auto max-w-xl px-4 py-8">
-      <AdminNav title="ตั้งค่าโลโก้หน่วยงาน" />
+      <AdminNav title="ตั้งค่า" />
+
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5">
+        <p className="mb-3 text-sm font-medium text-slate-600">ข้อมูลผู้ใช้งาน (แสดงแทนคำว่า "ผู้ดูแล" ในระบบ)</p>
+        {profileLoading ? (
+          <p className="text-sm text-slate-400">กำลังโหลด...</p>
+        ) : (
+          <form onSubmit={handleSaveProfile} className="grid grid-cols-2 gap-3">
+            <input
+              placeholder="ชื่อจริง"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            <input
+              placeholder="นามสกุล"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            <input
+              placeholder="วิชาชีพ (เช่น นักวิชาการสาธารณสุข)"
+              value={profession}
+              onChange={(e) => setProfession(e.target.value)}
+              className="col-span-2 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+            <button
+              type="submit"
+              disabled={profileSaving}
+              className="col-span-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {profileSaving ? 'กำลังบันทึก...' : profileSaved ? '✓ บันทึกแล้ว' : 'บันทึกข้อมูลผู้ใช้งาน'}
+            </button>
+          </form>
+        )}
+      </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-5">
         <p className="mb-3 text-sm font-medium text-slate-600">โลโก้ปัจจุบัน (แสดงที่หน้าแรกและหัวรายงาน)</p>

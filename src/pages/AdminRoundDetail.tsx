@@ -4,10 +4,13 @@ import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabaseClient'
 import type { AssessmentRound, Facility, Participant } from '../types'
 import AdminNav from '../components/AdminNav'
+import { formatThaiDate } from '../lib/thaiDate'
+import { useConfirm } from '../components/ConfirmProvider'
 
 export default function AdminRoundDetail() {
   const { roundId } = useParams<{ roundId: string }>()
   const navigate = useNavigate()
+  const confirm = useConfirm()
   const [round, setRound] = useState<AssessmentRound | null>(null)
   const [facility, setFacility] = useState<Facility | null>(null)
   const [participants, setParticipants] = useState<Participant[]>([])
@@ -54,8 +57,16 @@ export default function AdminRoundDetail() {
     setUpdating(false)
   }
 
+  async function togglePublic() {
+    if (!roundId || !round) return
+    setUpdating(true)
+    await supabase.from('assessment_rounds').update({ is_public: !round.is_public }).eq('id', roundId)
+    await load()
+    setUpdating(false)
+  }
+
   async function removeParticipant(id: string) {
-    if (!confirm('ลบผู้เข้าร่วมนี้ออกจากรอบการประเมิน?')) return
+    if (!(await confirm({ title: 'ลบผู้เข้าร่วม', message: 'ลบผู้เข้าร่วมนี้ออกจากรอบการประเมิน?', confirmLabel: 'ลบ' }))) return
     await supabase.from('participants').delete().eq('id', id)
     load()
   }
@@ -100,7 +111,12 @@ export default function AdminRoundDetail() {
 
   async function handleDeleteRound() {
     if (!roundId || !round) return
-    if (!confirm(`ลบรอบการประเมิน "${round.name}" ทั้งหมด รวมถึงคะแนนและผู้เข้าร่วมทั้งหมด? การลบนี้ย้อนกลับไม่ได้`)) return
+    const ok = await confirm({
+      title: 'ลบรอบการประเมิน',
+      message: `ลบรอบการประเมิน "${round.name}" ทั้งหมด รวมถึงคะแนนและผู้เข้าร่วมทั้งหมด?\nการลบนี้ย้อนกลับไม่ได้`,
+      confirmLabel: 'ลบทั้งหมด',
+    })
+    if (!ok) return
     setDeleting(true)
     const { error } = await supabase.from('assessment_rounds').delete().eq('id', roundId)
     setDeleting(false)
@@ -154,7 +170,7 @@ export default function AdminRoundDetail() {
               className="mb-3 w-full rounded-lg border border-slate-300 px-2 py-1 text-sm"
             />
           ) : (
-            <p className="mb-3 font-semibold text-slate-800">{round.survey_date ?? '-'}</p>
+            <p className="mb-3 font-semibold text-slate-800">{formatThaiDate(round.survey_date)}</p>
           )}
 
           {editingInfo && (
@@ -185,9 +201,23 @@ export default function AdminRoundDetail() {
               </button>
             ))}
           </div>
+
+          <p className="mt-3 text-sm text-slate-500">การเผยแพร่สู่สาธารณะ</p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={togglePublic}
+              disabled={updating || round.status !== 'completed'}
+              className={`rounded-lg border px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40 ${round.is_public ? 'border-sky-600 bg-sky-50 text-sky-700' : 'border-slate-300 text-slate-500'}`}
+            >
+              {round.is_public ? '✓ เผยแพร่อยู่ (คนทั่วไปดูได้ที่หน้า "ประวัติการประเมิน")' : 'ยังไม่เผยแพร่'}
+            </button>
+          </div>
+          {round.status !== 'completed' && (
+            <p className="mt-1 text-xs text-slate-400">ต้องปิดรับคะแนน (เสร็จสิ้น) ก่อน จึงจะเผยแพร่ผลสู่สาธารณะได้</p>
+          )}
         </div>
 
-        <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-5">
+        <div className="mx-auto flex w-full max-w-[75%] flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-5">
           <p className="mb-2 text-sm text-slate-500">รหัสเข้าร่วม (Join Code)</p>
           {editingCode ? (
             <div className="mb-3 flex flex-col items-center gap-2">
@@ -231,17 +261,18 @@ export default function AdminRoundDetail() {
               </button>
             </div>
           )}
-          <QRCodeSVG value={joinUrl} size={120} />
           <button
             onClick={() => {
               navigator.clipboard.writeText(joinUrl)
               setCopied(true)
               setTimeout(() => setCopied(false), 1500)
             }}
-            className="mt-3 text-xs text-emerald-700 underline"
+            title="คลิกเพื่อคัดลอกลิงก์เข้าร่วม"
+            className="cursor-pointer rounded-lg p-1 transition hover:bg-slate-50 active:scale-95"
           >
-            {copied ? 'คัดลอกแล้ว' : `คัดลอกลิงก์เข้าร่วม (${joinUrl})`}
+            <QRCodeSVG value={joinUrl} size={120} />
           </button>
+          <p className="mt-2 text-xs text-slate-400">{copied ? 'คัดลอกลิงก์แล้ว ✓' : 'แตะที่ QR code เพื่อคัดลอกลิงก์เข้าร่วม'}</p>
         </div>
       </div>
 

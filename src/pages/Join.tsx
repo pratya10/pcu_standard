@@ -8,6 +8,8 @@ export default function Join() {
   const navigate = useNavigate()
   const [joinCode, setJoinCode] = useState('')
   const [name, setName] = useState('')
+  const [civilServiceLevel, setCivilServiceLevel] = useState('')
+  const [affiliation, setAffiliation] = useState('')
   const [role, setRole] = useState<ParticipantRole>('evaluator')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -39,7 +41,14 @@ export default function Join() {
       const deviceKey = randomDeviceKey()
       const { data: participant, error: pErr } = await supabase
         .from('participants')
-        .insert({ round_id: round.id, name: name.trim(), role, device_key: deviceKey })
+        .insert({
+          round_id: round.id,
+          name: name.trim(),
+          role,
+          device_key: deviceKey,
+          civil_service_level: civilServiceLevel.trim() || null,
+          affiliation: affiliation.trim() || null,
+        })
         .select()
         .single()
       if (pErr) throw pErr
@@ -79,6 +88,32 @@ export default function Join() {
             className="w-full rounded-xl border border-slate-300 px-4 py-3"
           />
         </div>
+        {role === 'evaluator' && (
+          <>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-600">
+                ระดับข้าราชการ / ตำแหน่ง <span className="text-slate-400">(ไม่บังคับ)</span>
+              </label>
+              <input
+                value={civilServiceLevel}
+                onChange={(e) => setCivilServiceLevel(e.target.value)}
+                placeholder="เช่น ชำนาญการพิเศษ"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-600">
+                หน่วยงานที่สังกัด <span className="text-slate-400">(ไม่บังคับ)</span>
+              </label>
+              <input
+                value={affiliation}
+                onChange={(e) => setAffiliation(e.target.value)}
+                placeholder="เช่น สสจ.เชียงราย"
+                className="w-full rounded-xl border border-slate-300 px-4 py-3"
+              />
+            </div>
+          </>
+        )}
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-600">บทบาท</label>
           <div className="grid grid-cols-2 gap-2">

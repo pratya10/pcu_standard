@@ -13,6 +13,7 @@ import {
 } from 'docx'
 import { getLogoUrl } from './branding'
 import { formatAvg, type TopicAggregate } from './aggregate'
+import { formatThaiDate } from './thaiDate'
 import type { AssessmentRound, Facility, FullStandard, Participant, Topic, TopicEvidenceItem } from '../types'
 
 type TopicWithEvidence = Topic & { evidence: TopicEvidenceItem[] }
@@ -136,7 +137,7 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
         new TableRow({ children: [cell('หน่วยบริการ', { bold: true, width: 30 }), cell(facility?.name ?? '-', { width: 70 })] }),
         new TableRow({ children: [cell('รหัสหน่วยบริการ', { bold: true }), cell(facility?.code ?? '-')] }),
         new TableRow({ children: [cell('รอบการประเมิน', { bold: true }), cell(round.name)] }),
-        new TableRow({ children: [cell('วันที่ประเมิน', { bold: true }), cell(round.survey_date ?? '-')] }),
+        new TableRow({ children: [cell('วันที่ประเมิน', { bold: true }), cell(formatThaiDate(round.survey_date))] }),
         new TableRow({
           children: [cell('คณะกรรมการผู้ประเมิน', { bold: true }), cell(evaluators.map((e) => e.name).join(', ') || '-')],
         }),
