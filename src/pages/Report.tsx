@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { loadStandardByVersionId, allTopicsFlat } from '../lib/loadStandard'
@@ -308,43 +308,95 @@ export default function Report() {
         </p>
       </div>
 
-      <div className={printMode === 'detailed' ? 'hidden' : 'print:mb-8'}>
+      <div className={printMode === 'summary' ? 'print:mb-8' : ''}>
         {standard.categories.map((cat) => {
           const catTopics = [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
           const catTotal = catTopics.reduce((sum, t) => sum + (aggregates.get(t.id)?.avgScore ?? 0), 0)
           const catPass = catTopics.every((t) => aggregates.get(t.id)?.mustPassFinal !== false)
+          const compact = printMode === 'summary'
           return (
-            <div key={cat.id} className="mb-6 break-inside-avoid print:mb-1">
-              <h2 className="mb-2 text-sm font-bold text-slate-800 print:mb-0.5 print:text-[9px]">
+            <div key={cat.id} className={`mb-6 break-inside-avoid ${compact ? 'print:mb-1' : 'print:mb-6'}`}>
+              <h2 className={`mb-2 text-sm font-bold text-slate-800 ${compact ? 'print:mb-0.5 print:text-[9px]' : 'print:text-sm'}`}>
                 หมวดที่ {cat.code} · {cat.name_th}
               </h2>
-              <table className="w-full border-collapse text-sm print:text-[7.5px] print:leading-tight">
+              <table className={`w-full border-collapse text-sm ${compact ? 'print:text-[7.5px] print:leading-tight' : 'print:text-xs'}`}>
                 <thead>
-                  <tr className="border-b border-slate-300 text-left text-xs text-slate-500 print:text-[7px]">
-                    <th className="py-1 pr-2 print:py-0">หัวข้อ</th>
-                    <th className="py-1 pr-2 text-center print:py-0">The Must</th>
-                    <th className="py-1 pr-2 text-center print:py-0">คะแนน (0-2)</th>
+                  <tr className={`border-b border-slate-300 text-left text-xs text-slate-500 ${compact ? 'print:text-[7px]' : 'print:text-[11px]'}`}>
+                    <th className={`py-1 pr-2 ${compact ? 'print:py-0' : 'print:py-1'}`}>หัวข้อ</th>
+                    <th className={`py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>The Must</th>
+                    <th className={`py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>คะแนน (0-2)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {catTopics.map((t) => {
                     const agg = aggregates.get(t.id)
+                    const generalLines = compact ? [] : buildCommentLines(agg?.scores, evaluatorNameById, (s) => s.comment)
+                    const itemBlocks = compact
+                      ? []
+                      : t.scoreItems
+                          .map((item) => ({
+                            item,
+                            lines: buildCommentLines(agg?.scores, evaluatorNameById, (s) => s.item_notes?.[item.id]?.comment),
+                            itemPhotos: photosByTopicAndItem.get(t.id)?.get(item.id) ?? [],
+                          }))
+                          .filter((b) => b.lines.length > 0 || b.itemPhotos.length > 0)
+                    const hasDetail = generalLines.length > 0 || itemBlocks.length > 0
                     return (
-                      <tr key={t.id} className="border-b border-slate-100">
-                        <td className="py-1 pr-2 print:py-0">
-                          <span className="font-mono text-xs text-slate-400 print:text-[7px]">{t.code}</span> {t.name_th}
-                        </td>
-                        <td className="py-1 pr-2 text-center print:py-0">
-                          {agg?.mustPassFinal === null || agg?.mustPassFinal === undefined ? '-' : agg.mustPassFinal ? 'ผ่าน' : 'ไม่ผ่าน'}
-                        </td>
-                        <td className="py-1 pr-2 text-center font-semibold print:py-0">{formatAvg(agg?.avgScore ?? null)}</td>
-                      </tr>
+                      <Fragment key={t.id}>
+                        <tr className="border-b border-slate-100">
+                          <td className={`py-1 pr-2 ${compact ? 'print:py-0' : 'print:py-1'}`}>
+                            <span className={`font-mono text-xs text-slate-400 ${compact ? 'print:text-[7px]' : 'print:text-[10px]'}`}>{t.code}</span>{' '}
+                            {t.name_th}
+                          </td>
+                          <td className={`py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>
+                            {agg?.mustPassFinal === null || agg?.mustPassFinal === undefined ? '-' : agg.mustPassFinal ? 'ผ่าน' : 'ไม่ผ่าน'}
+                          </td>
+                          <td className={`py-1 pr-2 text-center font-semibold ${compact ? 'print:py-0' : 'print:py-1'}`}>{formatAvg(agg?.avgScore ?? null)}</td>
+                        </tr>
+                        {hasDetail && (
+                          <tr className="break-inside-avoid border-b border-slate-100">
+                            <td colSpan={3} className="bg-slate-50 px-3 py-2 align-top text-xs text-slate-600 print:text-[11px]">
+                              {generalLines.length > 0 && (
+                                <ul className="mb-1.5 list-none space-y-0.5 pl-0 last:mb-0">
+                                  {generalLines.map((line, i) => (
+                                    <li key={i}>{line}</li>
+                                  ))}
+                                </ul>
+                              )}
+                              {itemBlocks.map(({ item, lines, itemPhotos }) => (
+                                <div key={item.id} className="mt-1.5 border-l-2 border-slate-200 pl-2 first:mt-0">
+                                  <p className="font-medium text-slate-700">{item.item_text}</p>
+                                  {lines.length > 0 && (
+                                    <ul className="list-none space-y-0.5 pl-0">
+                                      {lines.map((line, i) => (
+                                        <li key={i}>{line}</li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                  {itemPhotos.length > 0 && (
+                                    <div className="mt-1 flex flex-wrap gap-2">
+                                      {itemPhotos.map((p) => (
+                                        <img
+                                          key={p.id}
+                                          src={getTopicPhotoUrl(p.file_path)}
+                                          alt={p.file_name ?? ''}
+                                          className="h-20 w-20 rounded-md border border-slate-200 object-cover"
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     )
                   })}
                   <tr className="font-semibold text-slate-800">
-                    <td className="py-1 pr-2 print:py-0">รวม</td>
-                    <td className="py-1 pr-2 text-center print:py-0">{catPass ? 'ผ่าน' : 'ไม่ผ่าน'}</td>
-                    <td className="py-1 pr-2 text-center print:py-0">{catTotal.toFixed(1)}</td>
+                    <td className={`py-1 pr-2 ${compact ? 'print:py-0' : 'print:py-1'}`}>รวม</td>
+                    <td className={`py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>{catPass ? 'ผ่าน' : 'ไม่ผ่าน'}</td>
+                    <td className={`py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>{catTotal.toFixed(1)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -352,73 +404,6 @@ export default function Report() {
           )
         })}
       </div>
-
-      {printMode === 'detailed' && (
-        <div>
-          {standard.categories.map((cat) => {
-            const catTopics = [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
-            return (
-              <div key={cat.id} className="mb-6 break-inside-avoid">
-                <h2 className="mb-2 text-sm font-bold text-slate-800">
-                  หมวดที่ {cat.code} · {cat.name_th}
-                </h2>
-                <div className="flex flex-col gap-4">
-                  {catTopics.map((t) => {
-                    const agg = aggregates.get(t.id)
-                    const generalLines = buildCommentLines(agg?.scores, evaluatorNameById, (s) => s.comment)
-                    const itemBlocks = t.scoreItems
-                      .map((item) => ({
-                        item,
-                        lines: buildCommentLines(agg?.scores, evaluatorNameById, (s) => s.item_notes?.[item.id]?.comment),
-                        itemPhotos: photosByTopicAndItem.get(t.id)?.get(item.id) ?? [],
-                      }))
-                      .filter((b) => b.lines.length > 0 || b.itemPhotos.length > 0)
-                    if (generalLines.length === 0 && itemBlocks.length === 0) return null
-                    return (
-                      <div key={t.id} className="break-inside-avoid rounded-lg border border-slate-200 p-3 text-sm">
-                        <p className="mb-2 font-semibold text-slate-800">
-                          <span className="font-mono text-xs text-slate-400">{t.code}</span> {t.name_th}
-                        </p>
-                        {generalLines.length > 0 && (
-                          <ul className="mb-2 list-none pl-0 text-slate-600">
-                            {generalLines.map((line, i) => (
-                              <li key={i}>{line}</li>
-                            ))}
-                          </ul>
-                        )}
-                        {itemBlocks.map(({ item, lines, itemPhotos }) => (
-                          <div key={item.id} className="mb-2 last:mb-0">
-                            <p className="font-medium text-slate-700">{item.item_text}</p>
-                            {lines.length > 0 && (
-                              <ul className="list-none pl-0 text-slate-600">
-                                {lines.map((line, i) => (
-                                  <li key={i}>{line}</li>
-                                ))}
-                              </ul>
-                            )}
-                            {itemPhotos.length > 0 && (
-                              <div className="mt-1 flex flex-wrap gap-2">
-                                {itemPhotos.map((p) => (
-                                  <img
-                                    key={p.id}
-                                    src={getTopicPhotoUrl(p.file_path)}
-                                    alt={p.file_name ?? ''}
-                                    className="h-20 w-20 rounded-md border border-slate-200 object-cover"
-                                  />
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
 
       {showAuditLog && auditLog.length > 0 && (
         <div className="no-print mb-6 rounded-xl border border-slate-200 p-4">
