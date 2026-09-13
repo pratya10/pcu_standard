@@ -20,10 +20,13 @@ type TopSection = Block & { subSections: Block[] }
 
 const RAINBOW = ['#e11d48', '#f97316', '#eab308', '#22c55e', '#0ea5e9', '#8b5cf6']
 
+// "Complete" just means every topic has been answered (any score/NA and any
+// Must result counts) — this is a progress indicator, not a perfect-score one.
 function isComplete(s: Summary, topicCount: number) {
-  const mustOk = s.mustTotal === 0 || (s.mustAnswered === s.mustTotal && s.mustPass === s.mustTotal)
-  const ciOk = topicCount === 0 || (s.ciAnswered === topicCount && s.ciMax > 0 && s.ciAchieved === s.ciMax)
-  return mustOk && ciOk && topicCount > 0
+  if (topicCount === 0) return false
+  const mustOk = s.mustTotal === 0 || s.mustAnswered === s.mustTotal
+  const ciOk = s.ciAnswered === topicCount
+  return mustOk && ciOk
 }
 
 export default function ScoreForm() {
