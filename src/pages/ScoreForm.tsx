@@ -53,6 +53,7 @@ export default function ScoreForm() {
   const [online, setOnline] = useState<PresenceInfo[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [headerHeight, setHeaderHeight] = useState(0)
+  const [scrollSpyId, setScrollSpyId] = useState<string | null>(null)
   const headerRef = useRef<HTMLDivElement>(null)
 
   const session = roundId ? getParticipantSession(roundId) : null
@@ -231,6 +232,62 @@ export default function ScoreForm() {
     return list
   }, [standard])
 
+  const allBlockIds = useMemo(
+    () => sections.flatMap((top) => (top.subSections.length > 0 ? top.subSections : [top])).map((b) => b.id),
+    [sections],
+  )
+
+  // A sub-section's nav row only renders while its parent category is
+  // expanded — so scroll-spy needs to know which parent to auto-open when
+  // it lands on a sub-section, otherwise the highlight would have nothing
+  // visible to land on.
+  const parentOfSubId = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const top of sections) {
+      for (const sub of top.subSections) map.set(sub.id, top.id)
+    }
+    return map
+  }, [sections])
+
+  // Scroll-spy: highlight whichever section's sticky header is currently
+  // pinned. A header is "pinned" once scrolling has pushed its natural
+  // position up past the sticky offset — so the last header (in document
+  // order) whose top is at or above that offset is the one currently stuck.
+  useEffect(() => {
+    if (allBlockIds.length === 0) return
+    let raf = 0
+    function update() {
+      raf = 0
+      let current: string | null = null
+      for (const id of allBlockIds) {
+        const el = document.getElementById(id)
+        if (!el) continue
+        if (el.getBoundingClientRect().top <= headerHeight + 8) {
+          current = id
+        } else {
+          break
+        }
+      }
+      setScrollSpyId(current)
+      const parent = current ? parentOfSubId.get(current) : undefined
+      if (parent) {
+        setExpanded((prev) => (prev.has(parent) ? prev : new Set(prev).add(parent)))
+      }
+    }
+    function onScroll() {
+      if (raf) return
+      raf = requestAnimationFrame(update)
+    }
+    update()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [allBlockIds, headerHeight, parentOfSubId])
+
   function summarize(topics: SectionTopic[]): Summary {
     let ciAchieved = 0
     let ciMax = 0
@@ -383,7 +440,7 @@ export default function ScoreForm() {
         const hasSub = top.subSections.length > 0
         const topicsForSummary = hasSub ? top.subSections.flatMap((s) => s.topics) : top.topics
         const summary = summarize(topicsForSummary)
-        const active = activeSectionId === top.id
+        const active = activeSectionId === top.id || scrollSpyId === top.id
         const isOpen = expanded.has(top.id)
         return (
           <div key={top.id}>
@@ -402,7 +459,7 @@ export default function ScoreForm() {
                   ? top.subSections.map((sub) => {
                       const subSummary = summarize(sub.topics)
                       const subOpen = expanded.has(sub.id)
-                      const subActive = activeSectionId === sub.id
+                      const subActive = activeSectionId === sub.id || scrollSpyId === sub.id
                       return (
                         <div key={sub.id}>
                           <button
