@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && cp dist/pcustandard71/index.html dist/index.html",
+    "build": "tsc -b && vite build && cp dist/pcustandard71/index.html dist/index.html && cp dist/pcustandard71/_headers dist/_headers",
     "lint": "oxlint",
     "preview": "vite preview",
     "seed": "node scripts/seed-standard.mjs",

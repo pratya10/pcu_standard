@@ -89,7 +89,12 @@ export default function AdminLogin() {
           </svg>
           เข้าสู่ระบบด้วย Google
         </div>
-        <div ref={buttonRef} className="absolute inset-0 overflow-hidden opacity-0" />
+        {/* Google's rendered iframe carries its own internal negative margin
+            and ends up a few px larger than the `width`/`height` we pass, so
+            clipping it to the visible button's exact box (inset-0 +
+            overflow-hidden) left a dead strip along the edges where clicks
+            didn't register. Give it a bit of slack on every side instead. */}
+        <div ref={buttonRef} className="absolute -inset-2 opacity-0" />
       </div>
 
       <VersionFooter />
