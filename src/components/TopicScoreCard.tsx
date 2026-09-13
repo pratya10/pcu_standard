@@ -368,7 +368,7 @@ export default function TopicScoreCard({
 
           <div className="mb-4">
             <p className="mb-1 text-base font-bold text-slate-800">คะแนน Continuous Improvement</p>
-            <div className={`grid gap-2 ${topic.allow_na ? 'grid-cols-4' : 'grid-cols-3'}`}>
+            <div className="grid grid-cols-4 gap-2">
               {([0, 1, 2] as ScoreValue[]).map((v) => (
                 <button
                   key={v}
@@ -384,20 +384,18 @@ export default function TopicScoreCard({
                   {v}
                 </button>
               ))}
-              {topic.allow_na && (
-                <button
-                  type="button"
-                  disabled={readOnly}
-                  onClick={() => {
-                    setIsNa(true)
-                    setScore(null)
-                    save({ isNa: true, score: null })
-                  }}
-                  className={`rounded-2xl border-2 py-3 text-lg font-bold ${isNa ? 'border-sky-600 bg-sky-500 text-white' : 'border-slate-300 text-slate-500'}`}
-                >
-                  N/A
-                </button>
-              )}
+              <button
+                type="button"
+                disabled={readOnly}
+                onClick={() => {
+                  setIsNa(true)
+                  setScore(null)
+                  save({ isNa: true, score: null })
+                }}
+                className={`rounded-2xl border-2 py-3 text-lg font-bold ${isNa ? 'border-sky-600 bg-sky-500 text-white' : 'border-slate-300 text-slate-500'}`}
+              >
+                N/A
+              </button>
             </div>
           </div>
 

@@ -14,34 +14,55 @@ import { getTopicPhotoUrl, groupPhotosByTopicAndItem, listRoundPhotos } from '..
 
 type CommentEntry = { text: string; author: string }
 
-// One evaluator's comment per entry — rendered as "ความคิดเห็น : {text} โดย
-// {author}" with the text itself made prominent and the author faint, no
-// numbering and no timestamp.
+// Collaborative-mode comments arrive pre-flattened as "[name · time] text"
+// lines (see teamScoreToScore) — split each line back into its own entry
+// with the embedded name as author and the time dropped, so the report
+// doesn't show that raw bracket text. A line with no bracket (average-mode
+// comments, or legacy data) just uses the participant's own name.
+function splitCommentEntries(raw: string, fallbackAuthor: string): CommentEntry[] {
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const m = line.match(/^\[([^\]]+)\]\s*(.*)$/)
+      if (!m) return { author: fallbackAuthor, text: line }
+      const name = m[1].split('·')[0].trim()
+      return { author: name || fallbackAuthor, text: m[2] }
+    })
+}
+
+// One evaluator's comment per entry — rendered as "ความคิดเห็น : {text}" with
+// "โดย {author}" faint underneath, no numbering and no timestamp.
 function buildCommentEntries(scores: Score[] | undefined, evaluatorNameById: Map<string, string>, pick: (s: Score) => string | null | undefined): CommentEntry[] {
   if (!scores) return []
   const entries: CommentEntry[] = []
   for (const s of scores) {
     const comment = pick(s)
     if (!comment) continue
-    entries.push({ text: comment, author: evaluatorNameById.get(s.participant_id) ?? 'กรรมการ' })
+    entries.push(...splitCommentEntries(comment, evaluatorNameById.get(s.participant_id) ?? 'กรรมการ'))
   }
   return entries
 }
 
-type ItemEntry = { checked: boolean; text: string | null; author: string }
+type ItemDetail = { checkedFinal: boolean | null; comments: CommentEntry[] }
 
-// Like buildCommentEntries, but also carries the ใช่/ไม่ checked state each
-// evaluator left on this specific sub-item (present whenever they've
-// touched the item at all, whether or not they also left a comment).
-function buildItemEntries(scores: Score[] | undefined, evaluatorNameById: Map<string, string>, itemId: string): ItemEntry[] {
-  if (!scores) return []
-  const entries: ItemEntry[] = []
+// The ใช่/ไม่ badge is a single value at the item's own header — majority
+// vote across whoever touched it (same rule aggregate.ts uses for a
+// topic's overall Must result), since average mode can have several
+// evaluators' own checked states for one item.
+function buildItemDetail(scores: Score[] | undefined, evaluatorNameById: Map<string, string>, itemId: string): ItemDetail {
+  if (!scores) return { checkedFinal: null, comments: [] }
+  const checks: boolean[] = []
+  const comments: CommentEntry[] = []
   for (const s of scores) {
     const note = s.item_notes?.[itemId]
     if (!note) continue
-    entries.push({ checked: note.checked, text: note.comment || null, author: evaluatorNameById.get(s.participant_id) ?? 'กรรมการ' })
+    checks.push(note.checked)
+    if (note.comment) comments.push(...splitCommentEntries(note.comment, evaluatorNameById.get(s.participant_id) ?? 'กรรมการ'))
   }
-  return entries
+  const checkedFinal = checks.length === 0 ? null : checks.filter(Boolean).length / checks.length >= 0.5
+  return { checkedFinal, comments }
 }
 
 // Mirrors the score-form's own grouping (The Must, then the 0/1/2 score
@@ -56,17 +77,28 @@ const ITEM_LEVEL_LABEL: Record<(typeof ITEM_LEVEL_ORDER)[number], string> = {
   [-2]: 'หลักฐานประกอบการประเมิน',
 }
 
-// "ความคิดเห็น : {text} โดย {author}" — the comment text itself is the
-// prominent part; the author is a faint attribution with no timestamp.
-function CommentLine({ entry, inline }: { entry: CommentEntry; inline?: boolean }) {
-  const content = (
-    <>
-      <span className="text-slate-400">ความคิดเห็น : </span>
-      <span className="whitespace-pre-line font-semibold text-slate-800">{entry.text}</span>{' '}
-      <span className="text-slate-400">โดย {entry.author}</span>
-    </>
+// "ความคิดเห็น : {text}" with "โดย {author}" faint on the line beneath —
+// the comment text itself is the prominent part.
+function CommentLine({ entry }: { entry: CommentEntry }) {
+  return (
+    <div>
+      <p>
+        <span className="text-slate-400">ความคิดเห็น : </span>
+        <span className="whitespace-pre-line font-semibold text-slate-800">{entry.text}</span>
+      </p>
+      <p className="text-slate-400">โดย {entry.author}</p>
+    </div>
   )
-  return inline ? content : <p>{content}</p>
+}
+
+// Same pill used on the score form's own ToggleSwitch, sitting right next
+// to the item text instead of stacked below each comment.
+function ItemCheckedBadge({ checked }: { checked: boolean }) {
+  return (
+    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold text-white ${checked ? 'bg-emerald-500' : 'bg-red-400'}`}>
+      {checked ? 'ใช่' : 'ไม่'}
+    </span>
+  )
 }
 
 export default function Report() {
@@ -385,10 +417,10 @@ export default function Report() {
                             .filter((item) => item.score_level === level)
                             .map((item) => ({
                               item,
-                              entries: buildItemEntries(agg?.scores, evaluatorNameById, item.id),
+                              detail: buildItemDetail(agg?.scores, evaluatorNameById, item.id),
                               itemPhotos: photosByTopicAndItem.get(t.id)?.get(item.id) ?? [],
                             }))
-                            .filter((b) => b.entries.length > 0 || b.itemPhotos.length > 0),
+                            .filter((b) => b.detail.checkedFinal !== null || b.detail.comments.length > 0 || b.itemPhotos.length > 0),
                         })).filter((g) => g.items.length > 0)
                     const hasDetail = generalEntries.length > 0 || levelGroups.length > 0
                     return (
@@ -417,22 +449,16 @@ export default function Report() {
                                 <div key={level} className="mt-1.5 first:mt-0">
                                   <p className="text-[11px] font-semibold text-slate-500">{ITEM_LEVEL_LABEL[level]}</p>
                                   <div className="ml-1 space-y-1.5 border-l-2 border-slate-200 pl-2 pt-1">
-                                    {items.map(({ item, entries, itemPhotos }) => (
+                                    {items.map(({ item, detail, itemPhotos }) => (
                                       <div key={item.id}>
-                                        <p className="font-medium text-slate-700">{item.item_text}</p>
-                                        {entries.length > 0 && (
-                                          <div className="space-y-0.5">
-                                            {entries.map((e, i) => (
-                                              <p key={i}>
-                                                <span className={`mr-1 font-semibold ${e.checked ? 'text-emerald-600' : 'text-red-500'}`}>
-                                                  {e.checked ? 'ใช่' : 'ไม่'}
-                                                </span>
-                                                {e.text ? (
-                                                  <CommentLine entry={{ text: e.text, author: e.author }} inline />
-                                                ) : (
-                                                  <span className="text-slate-400">โดย {e.author}</span>
-                                                )}
-                                              </p>
+                                        <div className="flex items-center gap-2">
+                                          {detail.checkedFinal !== null && <ItemCheckedBadge checked={detail.checkedFinal} />}
+                                          <p className="font-medium text-slate-700">{item.item_text}</p>
+                                        </div>
+                                        {detail.comments.length > 0 && (
+                                          <div className="mt-0.5 space-y-1 pl-1">
+                                            {detail.comments.map((e, i) => (
+                                              <CommentLine key={i} entry={e} />
                                             ))}
                                           </div>
                                         )}

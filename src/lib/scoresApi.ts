@@ -21,7 +21,7 @@ export async function upsertScore(draft: ScoreDraft): Promise<Score> {
         round_id: draft.roundId,
         topic_id: draft.topicId,
         participant_id: draft.participantId,
-        score: draft.isNa ? null : draft.score,
+        score: draft.isNa ? 0 : draft.score,
         is_na: draft.isNa,
         must_pass: draft.mustPass,
         comment: draft.comment || null,

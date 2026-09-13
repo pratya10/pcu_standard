@@ -640,7 +640,7 @@ export default function TeamTopicScoreCard({
 
               <div className="flex-[1.5]">
                 <p className="mb-1 text-[11px] font-bold text-slate-600">เกณฑ์การพัฒนาต่อเนื่อง</p>
-                <div className={`grid gap-1.5 ${topic.allow_na ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                <div className="grid grid-cols-4 gap-1.5">
                   {([0, 1, 2] as ScoreValue[]).map((v) => (
                     <button
                       key={v}
@@ -652,16 +652,14 @@ export default function TeamTopicScoreCard({
                       {v}
                     </button>
                   ))}
-                  {topic.allow_na && (
-                    <button
-                      type="button"
-                      disabled={readOnly}
-                      onClick={applyNa}
-                      className={`rounded-xl border-2 py-2 text-xs font-bold ${isNa ? 'border-sky-600 bg-sky-500 text-white' : 'border-slate-300 text-slate-500'}`}
-                    >
-                      N/A
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    disabled={readOnly}
+                    onClick={applyNa}
+                    className={`rounded-xl border-2 py-2 text-xs font-bold ${isNa ? 'border-sky-600 bg-sky-500 text-white' : 'border-slate-300 text-slate-500'}`}
+                  >
+                    N/A
+                  </button>
                 </div>
                 {teamScore?.updated_by && answered && (
                   <p className="mt-1 truncate text-[10px] text-slate-400">

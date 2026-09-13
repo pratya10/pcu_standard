@@ -5,7 +5,7 @@ export type TopicAggregate = {
   scores: Score[]
   nScored: number
   nNa: number
-  avgScore: number | null // average of 0/1/2 among non-NA scores
+  avgScore: number | null // average of 0/1/2, counting N/A answers as 0
   mustPassCount: number
   mustFailCount: number
   mustAnsweredCount: number
@@ -14,7 +14,9 @@ export type TopicAggregate = {
 
 export function aggregateForTopic(topicId: string, allScores: Score[]): TopicAggregate {
   const scores = allScores.filter((s) => s.topic_id === topicId)
-  const scored = scores.filter((s) => !s.is_na && s.score !== null)
+  // N/A counts as a score of 0 (its stored value), not as an exclusion —
+  // it's tracked separately below only so the report can still label it.
+  const scored = scores.filter((s) => s.score !== null)
   const naCount = scores.filter((s) => s.is_na).length
   const avgScore = scored.length ? scored.reduce((sum, s) => sum + (s.score as number), 0) / scored.length : null
 

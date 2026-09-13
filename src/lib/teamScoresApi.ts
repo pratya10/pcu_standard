@@ -97,7 +97,7 @@ export async function upsertTeamScore(
   const payload: Record<string, unknown> = {
     round_id: draft.roundId,
     topic_id: draft.topicId,
-    score: draft.isNa ? null : draft.score,
+    score: draft.isNa ? 0 : draft.score,
     is_na: draft.isNa,
     must_pass: draft.mustPass,
     comment: draft.comment || null,
