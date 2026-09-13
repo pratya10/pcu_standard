@@ -256,7 +256,7 @@ export default function Report() {
 
   function exportCsv() {
     if (!standard) return
-    const rows = [['หมวด', 'รหัสหัวข้อ', 'ชื่อหัวข้อ', 'ผ่าน The Must', 'คะแนนเฉลี่ย', 'จำนวนผู้ประเมิน', 'N/A']]
+    const rows = [['หมวด', 'รหัสหัวข้อ', 'ชื่อหัวข้อ', 'ผ่านมาตรฐานพื้นฐาน', 'คะแนนเฉลี่ย', 'จำนวนผู้ประเมิน', 'N/A']]
     for (const cat of standard.categories) {
       const catTopics = [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
       for (const t of catTopics) {
@@ -401,8 +401,8 @@ export default function Report() {
                 <thead>
                   <tr className={`border-b border-slate-300 text-left text-xs text-slate-500 ${compact ? 'print:text-[7px]' : 'print:text-[11px]'}`}>
                     <th className={`py-1 pr-2 ${compact ? 'print:py-0' : 'print:py-1'}`}>หัวข้อ</th>
-                    <th className={`py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>The Must</th>
-                    <th className={`py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>คะแนน (0-2)</th>
+                    <th className={`py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>มาตรฐานพื้นฐาน</th>
+                    <th className={`py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>การพัฒนาต่อเนื่อง</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -503,7 +503,7 @@ export default function Report() {
           <ul className="list-disc pl-5 text-sm text-slate-600">
             {auditLog.map((a) => {
               const topicLabel = flatTopics.find((t) => t.id === a.topic_id)
-              const fieldLabel = a.field === 'score' ? 'คะแนน' : a.field === 'must_pass' ? 'ผล The Must' : `ข้อย่อย "${itemTextById.get(a.item_id ?? '') ?? ''}"`
+              const fieldLabel = a.field === 'score' ? 'คะแนน' : a.field === 'must_pass' ? 'ผลมาตรฐานพื้นฐาน' : `ข้อย่อย "${itemTextById.get(a.item_id ?? '') ?? ''}"`
               const describe = (v: unknown) => (a.field === 'must_pass' ? (v ? 'ผ่าน' : 'ไม่ผ่าน') : a.field === 'item_checked' ? (v ? 'มี' : 'ไม่มี') : String(v))
               return (
                 <li key={a.id}>
@@ -522,7 +522,7 @@ export default function Report() {
           <p className="text-sm text-slate-500 print:text-[10px]">สรุปผลการประเมินภาพรวม</p>
           <p className="text-3xl font-bold text-slate-800 print:text-base">{grandTotal.toFixed(1)} คะแนน</p>
           <p className={`text-sm font-semibold print:text-[10px] ${overallPass ? 'text-emerald-600' : 'text-red-600'}`}>
-            {overallPass ? 'ผ่านเกณฑ์ The Must ครบทุกหัวข้อ' : `ไม่ผ่านเกณฑ์ The Must จำนวน ${mustFailTopics.length} หัวข้อ`}
+            {overallPass ? 'ผ่านเกณฑ์ มาตรฐานพื้นฐานครบทุกหัวข้อ' : `ไม่ผ่านเกณฑ์ มาตรฐานพื้นฐาน จำนวน ${mustFailTopics.length} หัวข้อ`}
           </p>
         </div>
 

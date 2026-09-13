@@ -238,8 +238,8 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
         tableHeader: true,
         children: [
           cell('หัวข้อ', { bold: true, width: 60 }),
-          cell('The Must', { bold: true, width: 20, align: AlignmentType.CENTER }),
-          cell('คะแนน (0-2)', { bold: true, width: 20, align: AlignmentType.CENTER }),
+          cell('มาตรฐานพื้นฐาน', { bold: true, width: 20, align: AlignmentType.CENTER }),
+          cell('การพัฒนาต่อเนื่อง', { bold: true, width: 20, align: AlignmentType.CENTER }),
         ],
       }),
     ]
@@ -297,7 +297,7 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
       alignment: AlignmentType.CENTER,
       children: [
         new TextRun({
-          text: overallPass ? 'ผ่านเกณฑ์ The Must ครบทุกหัวข้อ' : `ไม่ผ่านเกณฑ์ The Must จำนวน ${mustFailCount} หัวข้อ`,
+          text: overallPass ? 'ผ่านเกณฑ์ มาตรฐานพื้นฐานครบทุกหัวข้อ' : `ไม่ผ่านเกณฑ์ มาตรฐานพื้นฐาน จำนวน ${mustFailCount} หัวข้อ`,
           bold: true,
           color: overallPass ? '15803D' : 'DC2626',
         }),
