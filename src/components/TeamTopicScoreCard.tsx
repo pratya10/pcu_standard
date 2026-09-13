@@ -180,7 +180,10 @@ export default function TeamTopicScoreCard({
         newValue: checked,
       })
     }
-    const next = { ...itemNotes, [itemId]: { checked, checkedBy: participantId, comments: getNoteComments(current) } }
+    const next = {
+      ...itemNotes,
+      [itemId]: { checked, checkedBy: participantId, checkedAt: new Date().toISOString(), comments: getNoteComments(current) },
+    }
     await persist({ itemNotes: next })
   }
 
@@ -322,7 +325,12 @@ export default function TeamTopicScoreCard({
                   {itemPhotos.length > 0 ? itemPhotos.length : ''}
                 </button>
               </div>
-              {note?.checkedBy && <p className="mt-0.5 pl-[52px] text-[10px] text-slate-400">แก้ล่าสุดโดย {editorName(note.checkedBy)}</p>}
+              {note?.checkedBy && (
+                <p className="mt-0.5 pl-[52px] text-[10px] text-slate-400">
+                  {note.checkedAt && `${formatEntryTime(note.checkedAt)} `}
+                  {editorName(note.checkedBy)}
+                </p>
+              )}
               {commentOpen && (
                 <div className="mt-1.5 pl-9">
                   {noteComments.length > 0 && (
@@ -546,7 +554,10 @@ export default function TeamTopicScoreCard({
                     </button>
                   </div>
                   {teamScore?.must_pass_updated_by && mustPass !== null && (
-                    <p className="mt-1 truncate text-[10px] text-slate-400">แก้ล่าสุดโดย {editorName(teamScore.must_pass_updated_by)}</p>
+                    <p className="mt-1 truncate text-[10px] text-slate-400">
+                      {teamScore.must_pass_updated_at && `${formatEntryTime(teamScore.must_pass_updated_at)} `}
+                      {editorName(teamScore.must_pass_updated_by)}
+                    </p>
                   )}
                 </div>
               )}
@@ -577,7 +588,10 @@ export default function TeamTopicScoreCard({
                   )}
                 </div>
                 {teamScore?.updated_by && answered && (
-                  <p className="mt-1 truncate text-[10px] text-slate-400">แก้ล่าสุดโดย {editorName(teamScore.updated_by)}</p>
+                  <p className="mt-1 truncate text-[10px] text-slate-400">
+                    {teamScore.updated_at && `${formatEntryTime(teamScore.updated_at)} `}
+                    {editorName(teamScore.updated_by)}
+                  </p>
                 )}
               </div>
             </div>

@@ -105,7 +105,10 @@ export async function upsertTeamScore(
     updated_at: new Date().toISOString(),
   }
   if (attribution.ci) payload.updated_by = participantId
-  if (attribution.must) payload.must_pass_updated_by = participantId
+  if (attribution.must) {
+    payload.must_pass_updated_by = participantId
+    payload.must_pass_updated_at = payload.updated_at
+  }
 
   const { data, error } = await supabase.from('team_scores').upsert(payload, { onConflict: 'round_id,topic_id' }).select().single()
   if (error) throw error

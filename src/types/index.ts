@@ -181,6 +181,7 @@ export type TeamComment = {
 export type TeamItemNote = {
   checked: boolean
   checkedBy?: string | null
+  checkedAt?: string | null
   comments?: TeamComment[]
   /** @deprecated pre-migration free-text log; read-only, kept for old rows */
   comment?: string
@@ -197,6 +198,7 @@ export type TeamScore = {
   item_notes: Record<string, TeamItemNote>
   updated_by: string | null
   must_pass_updated_by: string | null
+  must_pass_updated_at: string | null
   updated_at: string
 }
 
