@@ -20,9 +20,19 @@ export async function saveMyAdminProfile(input: { firstName: string; lastName: s
     first_name: input.firstName.trim() || null,
     last_name: input.lastName.trim() || null,
     profession: input.profession.trim() || null,
+    email: user.email ?? null,
     updated_at: new Date().toISOString(),
   })
   if (error) throw error
+}
+
+export async function listAdminProfilesByEmail(): Promise<Map<string, AdminProfile>> {
+  const { data } = await supabase.from('admin_profiles').select('*').not('email', 'is', null)
+  const map = new Map<string, AdminProfile>()
+  for (const row of (data as AdminProfile[]) ?? []) {
+    if (row.email) map.set(row.email.toLowerCase(), row)
+  }
+  return map
 }
 
 export function formatAdminName(profile: AdminProfile | null, fallbackEmail?: string | null) {

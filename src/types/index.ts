@@ -100,6 +100,7 @@ export type AdminProfile = {
   first_name: string | null
   last_name: string | null
   profession: string | null
+  email: string | null
   updated_at: string
 }
 

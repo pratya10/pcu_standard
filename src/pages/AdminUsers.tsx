@@ -2,13 +2,16 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import type { AdminAllowlistEntry } from '../types'
 import { addAdminUser, listAdminUsers, removeAdminUser } from '../lib/adminUsers'
+import { listAdminProfilesByEmail } from '../lib/adminProfile'
 import { useConfirm } from '../components/ConfirmProvider'
 import { formatThaiDate } from '../lib/thaiDate'
 import AdminLayout from '../components/AdminLayout'
+import type { AdminProfile } from '../types'
 
 export default function AdminUsers() {
   const confirm = useConfirm()
   const [users, setUsers] = useState<AdminAllowlistEntry[]>([])
+  const [profilesByEmail, setProfilesByEmail] = useState<Map<string, AdminProfile>>(new Map())
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
   const [myEmail, setMyEmail] = useState<string | null>(null)
@@ -18,7 +21,9 @@ export default function AdminUsers() {
   async function load() {
     setLoading(true)
     try {
-      setUsers(await listAdminUsers())
+      const [userList, profiles] = await Promise.all([listAdminUsers(), listAdminProfilesByEmail()])
+      setUsers(userList)
+      setProfilesByEmail(profiles)
     } finally {
       setLoading(false)
     }
@@ -68,7 +73,7 @@ export default function AdminUsers() {
   }
 
   return (
-    <AdminLayout title="จัดการผู้ดูแลระบบ" maxWidth="max-w-2xl">
+    <AdminLayout title="จัดการผู้ดูแลระบบ" maxWidth="max-w-2xl lg:max-w-3xl xl:max-w-4xl">
       <form onSubmit={handleAdd} className="mb-6 flex gap-2 rounded-xl border border-slate-200 bg-white p-4">
         <input
           type="email"
@@ -92,19 +97,34 @@ export default function AdminUsers() {
         <p className="text-slate-400">กำลังโหลด...</p>
       ) : (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-          {users.map((u) => (
-            <div key={u.email} className="flex items-center justify-between border-b border-slate-100 px-4 py-3 text-sm last:border-0">
-              <div>
-                <p className="font-medium text-slate-800">
-                  {u.email} {u.email === myEmail && <span className="text-xs text-emerald-600">(คุณ)</span>}
-                </p>
-                <p className="text-xs text-slate-400">เพิ่มเมื่อ {formatThaiDate(u.created_at.slice(0, 10))}</p>
+          {users.map((u) => {
+            const profile = profilesByEmail.get(u.email.toLowerCase())
+            const fullName = profile ? [profile.first_name, profile.last_name].filter(Boolean).join(' ') : ''
+            return (
+              <div key={u.email} className="flex items-center justify-between border-b border-slate-100 px-4 py-3 text-sm last:border-0">
+                <div>
+                  {fullName ? (
+                    <>
+                      <p className="font-medium text-slate-800">
+                        {fullName}
+                        {profile?.profession && <span className="font-normal text-slate-500"> · {profile.profession}</span>}
+                        {u.email === myEmail && <span className="ml-1 text-xs text-emerald-600">(คุณ)</span>}
+                      </p>
+                      <p className="text-xs text-slate-400">{u.email}</p>
+                    </>
+                  ) : (
+                    <p className="font-medium text-slate-800">
+                      {u.email} {u.email === myEmail && <span className="text-xs text-emerald-600">(คุณ)</span>}
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-400">เพิ่มเมื่อ {formatThaiDate(u.created_at.slice(0, 10))}</p>
+                </div>
+                <button onClick={() => handleRemove(u)} className="text-xs text-red-500 hover:underline">
+                  ลบ
+                </button>
               </div>
-              <button onClick={() => handleRemove(u)} className="text-xs text-red-500 hover:underline">
-                ลบ
-              </button>
-            </div>
-          ))}
+            )
+          })}
           {users.length === 0 && <p className="px-4 py-6 text-center text-sm text-slate-400">ยังไม่มีผู้ดูแลระบบ</p>}
         </div>
       )}

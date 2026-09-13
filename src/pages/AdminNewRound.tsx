@@ -101,7 +101,7 @@ export default function AdminNewRound() {
   }
 
   return (
-    <AdminLayout title="สร้างรอบการประเมินใหม่" maxWidth="max-w-xl">
+    <AdminLayout title="สร้างรอบการประเมินใหม่" maxWidth="max-w-xl lg:max-w-2xl xl:max-w-3xl">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-5">
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-600">หน่วยบริการ</label>

@@ -68,6 +68,10 @@ export default function Join() {
       setError('กรุณากรอกรหัสเข้าร่วมและชื่อ-สกุล')
       return
     }
+    if (role === 'evaluator' && (!civilServiceLevel.trim() || !affiliation.trim())) {
+      setError('กรุณากรอกระดับข้าราชการ/ตำแหน่ง และหน่วยงานที่สังกัดให้ครบก่อนเข้าร่วม')
+      return
+    }
     setLoading(true)
     try {
       const { data: round, error: roundErr } = await supabase
@@ -126,14 +130,16 @@ export default function Join() {
       // — closed the tab, hit back, or exited — and are rejoining). This
       // keeps their previously-entered scores intact.
       const trimmedName = name.trim()
-      const { data: existing, error: existingErr } = await supabase
+      const { data: existingRows, error: existingErr } = await supabase
         .from('participants')
         .select('*')
         .eq('round_id', round.id)
         .eq('role', role)
         .ilike('name', trimmedName)
-        .maybeSingle()
+        .order('joined_at', { ascending: false })
+        .limit(1)
       if (existingErr) throw existingErr
+      const existing = existingRows?.[0] ?? null
 
       const deviceKey = randomDeviceKey()
       let participant
@@ -232,7 +238,7 @@ export default function Join() {
           <>
             <div>
               <label className="mb-1 block text-lg font-semibold text-slate-700">
-                ระดับข้าราชการ / ตำแหน่ง <span className="text-base font-normal text-slate-400">(ไม่บังคับ)</span>
+                ระดับข้าราชการ / ตำแหน่ง <span className="text-base font-normal text-red-500">*</span>
               </label>
               <input
                 value={civilServiceLevel}
@@ -243,7 +249,7 @@ export default function Join() {
             </div>
             <div>
               <label className="mb-1 block text-lg font-semibold text-slate-700">
-                หน่วยงานที่สังกัด <span className="text-base font-normal text-slate-400">(ไม่บังคับ)</span>
+                หน่วยงานที่สังกัด <span className="text-base font-normal text-red-500">*</span>
               </label>
               <input
                 value={affiliation}

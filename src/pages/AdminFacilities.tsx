@@ -100,9 +100,9 @@ export default function AdminFacilities() {
   return (
     <AdminLayout title="จัดการหน่วยบริการ (PCU)">
 
-      <form onSubmit={handleSubmit} className="mb-8 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4">
+      <form onSubmit={handleSubmit} className="mb-8 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-3">
         {editingId && (
-          <p className="col-span-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+          <p className="col-span-full rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
             กำลังแก้ไข: {facilities.find((f) => f.id === editingId)?.name}
           </p>
         )}
@@ -150,22 +150,22 @@ export default function AdminFacilities() {
           placeholder="โรงพยาบาลแม่ข่าย (CUP)"
           value={form.cup_hospital}
           onChange={(e) => setForm({ ...form, cup_hospital: e.target.value })}
-          className="col-span-2 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          className="col-span-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
         <input
           placeholder="ที่อยู่"
           value={form.address}
           onChange={(e) => setForm({ ...form, address: e.target.value })}
-          className="col-span-2 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          className="col-span-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
         <input
           placeholder="ช่องทางติดต่อ"
           value={form.contact}
           onChange={(e) => setForm({ ...form, contact: e.target.value })}
-          className="col-span-2 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          className="col-span-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
-        {error && <p className="col-span-2 text-sm text-red-600">{error}</p>}
-        <div className="col-span-2 flex gap-2">
+        {error && <p className="col-span-full text-sm text-red-600">{error}</p>}
+        <div className="col-span-full flex gap-2">
           <button
             type="submit"
             disabled={saving}

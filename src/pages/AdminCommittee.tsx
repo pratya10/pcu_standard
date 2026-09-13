@@ -98,9 +98,9 @@ export default function AdminCommittee() {
         ข้อมูลอ้างอิงสำหรับใช้ประกอบการประเมิน (ระดับ/ตำแหน่ง สังกัด) แยกจากรายชื่อผู้เข้าร่วมในแต่ละรอบที่เก็บตอนกดเข้าร่วมด้วยรหัส
       </p>
 
-      <form onSubmit={handleSubmit} className="mb-8 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4">
+      <form onSubmit={handleSubmit} className="mb-8 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-3">
         {editingId && (
-          <p className="col-span-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+          <p className="col-span-full rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
             กำลังแก้ไข: {members.find((m) => m.id === editingId)?.name}
           </p>
         )}
@@ -144,10 +144,10 @@ export default function AdminCommittee() {
           placeholder="หมายเหตุ"
           value={form.note}
           onChange={(e) => setForm({ ...form, note: e.target.value })}
-          className="col-span-2 rounded-lg border border-slate-300 px-3 py-2 text-sm"
+          className="col-span-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
-        {error && <p className="col-span-2 text-sm text-red-600">{error}</p>}
-        <div className="col-span-2 flex gap-2">
+        {error && <p className="col-span-full text-sm text-red-600">{error}</p>}
+        <div className="col-span-full flex gap-2">
           <button
             type="submit"
             disabled={saving}

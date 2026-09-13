@@ -84,7 +84,7 @@ export default function AdminSettings() {
   }
 
   return (
-    <AdminLayout title="ตั้งค่า" maxWidth="max-w-xl">
+    <AdminLayout title="ตั้งค่า" maxWidth="max-w-xl lg:max-w-2xl xl:max-w-3xl">
       <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5">
         <p className="mb-3 text-sm font-medium text-slate-600">ข้อมูลผู้ใช้งาน (แสดงแทนคำว่า "ผู้ดูแล" ในระบบ)</p>
         {profileLoading ? (

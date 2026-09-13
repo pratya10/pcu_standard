@@ -14,7 +14,7 @@ const NAV_ITEMS = [
 export default function AdminLayout({
   title,
   children,
-  maxWidth = 'max-w-4xl',
+  maxWidth = 'max-w-4xl xl:max-w-6xl 2xl:max-w-7xl',
 }: {
   title: string
   children: ReactNode
