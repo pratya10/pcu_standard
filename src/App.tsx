@@ -15,10 +15,12 @@ import Report from './pages/Report'
 import PublicHistory from './pages/PublicHistory'
 import RequireAdmin from './components/RequireAdmin'
 import { ConfirmProvider } from './components/ConfirmProvider'
+import VersionBadge from './components/VersionBadge'
 
 export default function App() {
   return (
     <ConfirmProvider>
+      <VersionBadge />
       <BrowserRouter basename="/pcustandard71">
         <Routes>
           <Route path="/" element={<Home />} />

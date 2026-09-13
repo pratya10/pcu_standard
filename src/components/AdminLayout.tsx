@@ -3,6 +3,15 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { formatAdminName, getMyAdminProfile } from '../lib/adminProfile'
 
+function formatBuildDate(iso: string) {
+  const d = new Date(iso)
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${dd} ${months[d.getMonth()]} ${d.getFullYear()} ${hh}:${mm}`
+}
+
 const NAV_ITEMS = [
   { to: '/admin', label: 'รอบการประเมิน' },
   { to: '/admin/facilities', label: 'หน่วยบริการ' },
@@ -71,6 +80,13 @@ export default function AdminLayout({
           >
             ออกจากระบบ
           </button>
+        </div>
+        <div className="border-t border-slate-100 p-3">
+          <p className="text-[10px] leading-tight text-slate-400">
+            Version {__APP_VERSION__}
+            <br />
+            {formatBuildDate(__BUILD_DATE__)} ( {__GIT_HASH__} )
+          </p>
         </div>
       </aside>
 
