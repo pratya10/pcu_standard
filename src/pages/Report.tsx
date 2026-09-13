@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { loadStandardByVersionId, allTopicsFlat } from '../lib/loadStandard'
 import { fetchScoresForRound } from '../lib/scoresApi'
@@ -14,6 +14,7 @@ import { getTopicPhotoUrl, listRoundPhotos } from '../lib/topicPhotos'
 
 export default function Report() {
   const { roundId } = useParams<{ roundId: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [round, setRound] = useState<AssessmentRound | null>(null)
   const [facility, setFacility] = useState<Facility | null>(null)
   const [standard, setStandard] = useState<FullStandard | null>(null)
@@ -72,6 +73,19 @@ export default function Report() {
     setPrintMode('summary')
     requestAnimationFrame(() => requestAnimationFrame(() => window.print()))
   }
+
+  useEffect(() => {
+    if (loading) return
+    const autoPrint = searchParams.get('print')
+    if (autoPrint === 'summary') printSummary()
+    else if (autoPrint === 'detailed') printDetailed()
+    if (autoPrint) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('print')
+      setSearchParams(next, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading])
 
   const flatTopics = useMemo(() => (standard ? allTopicsFlat(standard) : []), [standard])
   const aggregates = useMemo(() => aggregateAll(flatTopics.map((t) => t.id), scores), [flatTopics, scores])

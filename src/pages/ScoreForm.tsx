@@ -8,20 +8,22 @@ import { getParticipantSession } from '../lib/participantSession'
 import type { AssessmentRound, FullStandard, Participant, Score, TeamScore } from '../types'
 import TopicScoreCard from '../components/TopicScoreCard'
 import TeamTopicScoreCard from '../components/TeamTopicScoreCard'
+import Icon from '../components/Icon'
 
 type SectionTopic = FullStandard['categories'][number]['topics'][number]
 
-type Section = {
-  id: string
-  navLabel: string
-  headerLabel: string
-  color: string
-  topics: SectionTopic[]
-}
+type Summary = { ciAchieved: number; ciMax: number; ciAnswered: number; mustPass: number; mustTotal: number; mustAnswered: number }
 
-type TopicResult = { score: number | null; isNa: boolean; mustPass: boolean | null } | undefined
+type Block = { id: string; navLabel: string; headerLabel: string; color: string; topics: SectionTopic[] }
+type TopSection = Block & { subSections: Block[] }
 
 const RAINBOW = ['#e11d48', '#f97316', '#eab308', '#22c55e', '#0ea5e9', '#8b5cf6']
+
+function isComplete(s: Summary, topicCount: number) {
+  const mustOk = s.mustTotal === 0 || (s.mustAnswered === s.mustTotal && s.mustPass === s.mustTotal)
+  const ciOk = topicCount === 0 || (s.ciAnswered === topicCount && s.ciMax > 0 && s.ciAchieved === s.ciMax)
+  return mustOk && ciOk && topicCount > 0
+}
 
 export default function ScoreForm() {
   const { roundId } = useParams<{ roundId: string }>()
@@ -34,6 +36,7 @@ export default function ScoreForm() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [navOpen, setNavOpen] = useState(false)
 
   const session = roundId ? getParticipantSession(roundId) : null
@@ -91,7 +94,7 @@ export default function ScoreForm() {
   const teamScoreByTopic = useMemo(() => new Map(teamScores.map((s) => [s.topic_id, s])), [teamScores])
   const participantNameById = useMemo(() => new Map(participants.map((p) => [p.id, p.name])), [participants])
 
-  function resultFor(topicId: string): TopicResult {
+  function resultFor(topicId: string) {
     if (collaborative) {
       const s = teamScoreByTopic.get(topicId)
       return s ? { score: s.score, isNa: s.is_na, mustPass: s.must_pass } : undefined
@@ -105,43 +108,57 @@ export default function ScoreForm() {
     return !!r && (r.isNa || r.score !== null)
   }).length
 
-  // Rainbow-ordered sections for the jump nav: หมวด 1, หมวด 2.1-2.4, หมวด 3.
-  const sections = useMemo<Section[]>(() => {
-    const list: Section[] = []
+  // Rainbow-ordered sections for the jump nav: หมวด 1, หมวด 2 (with 2.1-2.4
+  // as a submenu), หมวด 3.
+  const sections = useMemo<TopSection[]>(() => {
+    const list: TopSection[] = []
     let i = 0
     for (const cat of standard?.categories ?? []) {
-      if (cat.topics.length > 0) {
+      if (cat.groups.length === 0) {
+        if (cat.topics.length > 0) {
+          list.push({
+            id: `sec-cat-${cat.id}`,
+            navLabel: `หมวด ${cat.code}`,
+            headerLabel: `หมวดที่ ${cat.code} · ${cat.name_th}`,
+            color: RAINBOW[i % RAINBOW.length],
+            topics: cat.topics,
+            subSections: [],
+          })
+          i++
+        }
+      } else {
+        const subSections = cat.groups.map((g) => {
+          const sub = {
+            id: `sec-group-${g.id}`,
+            navLabel: `${g.code} ${g.name_th}`,
+            headerLabel: `${g.code} ${g.name_th}`,
+            color: RAINBOW[i % RAINBOW.length],
+            topics: g.topics,
+          }
+          i++
+          return sub
+        })
         list.push({
           id: `sec-cat-${cat.id}`,
           navLabel: `หมวด ${cat.code}`,
           headerLabel: `หมวดที่ ${cat.code} · ${cat.name_th}`,
-          color: RAINBOW[i % RAINBOW.length],
+          color: '#64748b',
           topics: cat.topics,
+          subSections,
         })
-        i++
-      }
-      for (const g of cat.groups) {
-        list.push({
-          id: `sec-group-${g.id}`,
-          navLabel: `${g.code} ${g.name_th}`,
-          headerLabel: `${g.code} ${g.name_th}`,
-          color: RAINBOW[i % RAINBOW.length],
-          topics: g.topics,
-        })
-        i++
       }
     }
     return list
   }, [standard])
 
-  function sectionSummary(section: Section) {
+  function summarize(topics: SectionTopic[]): Summary {
     let ciAchieved = 0
     let ciMax = 0
     let ciAnswered = 0
     let mustPass = 0
     let mustTotal = 0
     let mustAnswered = 0
-    for (const t of section.topics) {
+    for (const t of topics) {
       const s = resultFor(t.id)
       if (!s?.isNa) {
         ciAchieved += s?.score ?? 0
@@ -170,12 +187,29 @@ export default function ScoreForm() {
   }
 
   const readOnly = round.status === 'completed' || session.role === 'viewer'
-  const visibleSections = activeSectionId ? sections.filter((s) => s.id === activeSectionId) : sections
+
+  const allBlocks: Block[] = sections.flatMap((top) => (top.subSections.length > 0 ? top.subSections : [top]))
+  const visibleBlocks: Block[] = activeSectionId
+    ? (() => {
+        const top = sections.find((s) => s.id === activeSectionId && s.subSections.length > 0)
+        if (top) return top.subSections
+        return allBlocks.filter((b) => b.id === activeSectionId)
+      })()
+    : allBlocks
 
   function selectSection(id: string) {
     setActiveSectionId((prev) => (prev === id ? null : id))
     setNavOpen(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function toggleExpanded(id: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   async function handleSave(topicId: string, draft: Parameters<Parameters<typeof TopicScoreCard>[0]['onSave']>[0]) {
@@ -203,6 +237,38 @@ export default function ScoreForm() {
     })
   }
 
+  function ScoreBadges({ summary }: { summary: Summary }) {
+    const mustClass =
+      summary.mustAnswered === 0
+        ? 'text-slate-400'
+        : summary.mustPass === summary.mustTotal
+          ? 'bg-emerald-100 text-emerald-700'
+          : 'bg-slate-200 text-slate-600'
+    const ciClass =
+      summary.ciAnswered === 0
+        ? 'text-slate-400'
+        : summary.ciMax > 0 && summary.ciAchieved === summary.ciMax
+          ? 'bg-emerald-100 text-emerald-700'
+          : 'bg-slate-200 text-slate-600'
+    return (
+      <span className="flex gap-1 pl-[18px]">
+        {summary.mustTotal > 0 && (
+          <span title="The Must" className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${mustClass}`}>
+            {summary.mustPass} | {summary.mustTotal}
+          </span>
+        )}
+        <span title="Continuous Improvement" className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${ciClass}`}>
+          {summary.ciAchieved} | {summary.ciMax}
+        </span>
+      </span>
+    )
+  }
+
+  function NavDot({ color, complete }: { color: string; complete: boolean }) {
+    if (complete) return <Icon name="check_circle" filled className="!text-base shrink-0 text-emerald-600" />
+    return <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+  }
+
   const navList = (
     <>
       <div className="mb-1 flex items-center justify-between">
@@ -213,45 +279,72 @@ export default function ScoreForm() {
           </button>
         )}
       </div>
-      {sections.map((s) => {
-        const { ciAchieved, ciMax, ciAnswered, mustPass, mustTotal, mustAnswered } = sectionSummary(s)
-        const active = activeSectionId === s.id
-        const mustClass =
-          mustAnswered === 0
-            ? 'text-slate-400'
-            : mustPass === mustTotal
-              ? 'bg-emerald-100 text-emerald-700'
-              : 'bg-slate-200 text-slate-600'
-        const ciClass =
-          ciAnswered === 0
-            ? 'text-slate-400'
-            : ciMax > 0 && ciAchieved === ciMax
-              ? 'bg-emerald-100 text-emerald-700'
-              : 'bg-slate-200 text-slate-600'
+      {sections.map((top) => {
+        const hasSub = top.subSections.length > 0
+        const topicsForSummary = hasSub ? top.subSections.flatMap((s) => s.topics) : top.topics
+        const summary = summarize(topicsForSummary)
+        const active = activeSectionId === top.id
+        const isOpen = expanded.has(top.id)
         return (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => selectSection(s.id)}
-            className={`flex flex-col gap-0.5 rounded-lg px-2 py-2 text-left text-xs font-medium ${active ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}
-          >
-            <span className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
-              <span className="flex-1 truncate">{s.navLabel}</span>
-            </span>
-            <span className="flex gap-1 pl-[18px]">
-              {mustTotal > 0 && (
-                <span title="The Must" className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${mustClass}`}>
-                  {mustPass} | {mustTotal}
-                </span>
-              )}
-              <span title="Continuous Improvement" className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${ciClass}`}>
-                {ciAchieved} | {ciMax}
+          <div key={top.id}>
+            <button
+              type="button"
+              onClick={() => (hasSub ? toggleExpanded(top.id) : selectSection(top.id))}
+              className={`flex w-full flex-col gap-0.5 rounded-lg px-2 py-2 text-left text-xs font-medium ${active ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+              <span className="flex items-center gap-2">
+                <NavDot color={top.color} complete={isComplete(summary, topicsForSummary.length)} />
+                <span className="flex-1 truncate">{top.navLabel}</span>
+                {hasSub && <span className="text-slate-300">{isOpen ? '▾' : '▸'}</span>}
               </span>
-            </span>
-          </button>
+              <ScoreBadges summary={summary} />
+            </button>
+            {hasSub && isOpen && (
+              <div className="ml-3 flex flex-col gap-1 border-l border-slate-100 pl-2">
+                {top.subSections.map((sub) => {
+                  const subSummary = summarize(sub.topics)
+                  const subActive = activeSectionId === sub.id
+                  return (
+                    <button
+                      key={sub.id}
+                      type="button"
+                      onClick={() => selectSection(sub.id)}
+                      className={`flex flex-col gap-0.5 rounded-lg px-2 py-2 text-left text-xs font-medium ${subActive ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <NavDot color={sub.color} complete={isComplete(subSummary, sub.topics.length)} />
+                        <span className="flex-1 truncate">{sub.navLabel}</span>
+                      </span>
+                      <ScoreBadges summary={subSummary} />
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         )
       })}
+
+      <div className="mt-3 flex flex-col gap-1 border-t border-slate-100 pt-3">
+        <Link to={`/round/${roundId}/live`} className="rounded-lg px-2 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50">
+          ดูคะแนนรวม (Real-time)
+        </Link>
+        <Link
+          to={`/round/${roundId}/report?print=summary`}
+          className="rounded-lg px-2 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50"
+        >
+          รายงานแบบสรุป (PDF)
+        </Link>
+        <Link
+          to={`/round/${roundId}/report?print=detailed`}
+          className="rounded-lg px-2 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50"
+        >
+          รายงานฉบับเต็ม (PDF)
+        </Link>
+        <Link to="/admin" className="rounded-lg px-2 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50">
+          หน้าแอดมิน
+        </Link>
+      </div>
     </>
   )
 
@@ -309,9 +402,6 @@ export default function ScoreForm() {
           {collaborative && (
             <p className="mt-1 text-[11px] font-medium text-sky-600">โหมดทีมคณะกรรมช่วยกัน — ทุกคนเห็นและแก้ไขคะแนนชุดเดียวกันแบบ real-time</p>
           )}
-          <Link to={`/round/${roundId}/live`} className="mt-2 inline-block text-xs text-emerald-700 underline">
-            ดูคะแนนรวมแบบ Real-time →
-          </Link>
           {readOnly && (
             <p className="mt-2 rounded-lg bg-slate-100 p-2 text-xs text-slate-500">
               {round.status === 'completed' ? 'รอบนี้ปิดรับคะแนนแล้ว (โหมดดูอย่างเดียว)' : 'ผู้สังเกตการณ์ดูข้อมูลได้อย่างเดียว'}
@@ -319,7 +409,7 @@ export default function ScoreForm() {
           )}
         </div>
 
-        {visibleSections.map((s) => (
+        {visibleBlocks.map((s) => (
           <div key={s.id} className="mb-6">
             <h2 id={s.id} className="mb-2 scroll-mt-40 text-sm font-bold text-slate-700">
               {s.headerLabel}

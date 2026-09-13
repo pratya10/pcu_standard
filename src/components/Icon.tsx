@@ -1,6 +1,10 @@
-export default function Icon({ name, className }: { name: string; className?: string }) {
+export default function Icon({ name, className, filled }: { name: string; className?: string; filled?: boolean }) {
   return (
-    <span className={`material-symbols-outlined ${className ?? ''}`} aria-hidden="true">
+    <span
+      className={`material-symbols-outlined ${className ?? ''}`}
+      style={filled ? { fontVariationSettings: "'FILL' 1" } : undefined}
+      aria-hidden="true"
+    >
       {name}
     </span>
   )
