@@ -9,6 +9,7 @@ import AdminFacilities from './pages/AdminFacilities'
 import AdminSettings from './pages/AdminSettings'
 import AdminUsers from './pages/AdminUsers'
 import AdminCommittee from './pages/AdminCommittee'
+import AdminTopicNicknames from './pages/AdminTopicNicknames'
 import ScoreForm from './pages/ScoreForm'
 import LiveDashboard from './pages/LiveDashboard'
 import Report from './pages/Report'
@@ -63,6 +64,14 @@ export default function App() {
             element={
               <RequireAdmin>
                 <AdminCommittee />
+              </RequireAdmin>
+            }
+          />
+          <Route
+            path="/admin/topics"
+            element={
+              <RequireAdmin>
+                <AdminTopicNicknames />
               </RequireAdmin>
             }
           />

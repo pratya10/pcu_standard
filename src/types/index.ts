@@ -50,6 +50,7 @@ export type Topic = {
   topic_group_id: string | null
   code: string
   name_th: string
+  short_name: string | null
   intent_text: string | null
   must_text: string | null
   score0_text: string | null

@@ -16,6 +16,7 @@ function formatBuildDate(iso: string) {
 const NAV_ITEMS = [
   { to: '/admin', label: 'รอบการประเมิน' },
   { to: '/admin/facilities', label: 'หน่วยบริการ' },
+  { to: '/admin/topics', label: 'ชื่อเล่นหัวข้อ' },
   { to: '/admin/committee', label: 'คณะกรรมการ' },
   { to: '/admin/users', label: 'ผู้ดูแลระบบ' },
   { to: '/admin/settings', label: 'ตั้งค่า' },

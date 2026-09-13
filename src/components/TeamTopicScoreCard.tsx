@@ -501,7 +501,7 @@ export default function TeamTopicScoreCard({
 
           {topic.must_text && (
             <div className="mb-4 rounded-lg border-2 border-amber-400 bg-amber-50 p-3">
-              <p className="mb-2 text-base font-bold text-amber-900">⚠ เกณฑ์ The Must (ต้องมี)</p>
+              <p className="mb-2 text-base font-bold text-amber-900">⚠ เกณฑ์มาตรฐานพื้นฐาน (The Must | ต้องมี)</p>
               {itemsByLevel['-1'].length > 0 ? (
                 renderChecklist(itemsByLevel['-1'])
               ) : (
@@ -530,82 +530,6 @@ export default function TeamTopicScoreCard({
               {renderChecklist(itemsByLevel['-2'])}
             </div>
           )}
-
-          {/* Sticky action bar: pinned to the bottom of the screen while
-              scrolling through this topic's own content above, then
-              releases back into normal flow once scroll reaches its real
-              position here — letting the next topic's bar take over. The
-              small code/name line exists because by the time it's pinned,
-              the topic header up top is usually long scrolled out of view. */}
-          <div className="sticky bottom-0 z-10 -mx-4 mt-2 border-t border-slate-200 bg-white/95 px-4 pt-2 pb-2.5 backdrop-blur">
-            <p className="mb-1 truncate text-[10px] font-medium text-slate-400">
-              {topic.code} · {topic.name_th}
-            </p>
-            <div className="flex gap-3">
-              {topic.must_text && (
-                <div className="flex-1">
-                  <p className="mb-1 text-[11px] font-bold text-slate-600">มาตรฐานพื้นฐาน</p>
-                  <div className="flex gap-1.5">
-                    <button
-                      type="button"
-                      disabled={readOnly}
-                      onClick={() => applyMustPass(false)}
-                      className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold ${mustPass === false ? 'border-red-600 bg-red-500 text-white' : 'border-slate-300 text-slate-500'}`}
-                    >
-                      ✗ ไม่ผ่าน
-                    </button>
-                    <button
-                      type="button"
-                      disabled={readOnly}
-                      onClick={() => applyMustPass(true)}
-                      className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold ${mustPass === true ? 'border-emerald-600 bg-emerald-500 text-white' : 'border-slate-300 text-slate-500'}`}
-                    >
-                      ✓ ผ่าน
-                    </button>
-                  </div>
-                  {teamScore?.must_pass_updated_by && mustPass !== null && (
-                    <p className="mt-1 truncate text-[10px] text-slate-400">
-                      {teamScore.must_pass_updated_at && `${formatEntryTime(teamScore.must_pass_updated_at)} `}
-                      {editorName(teamScore.must_pass_updated_by)}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              <div className={topic.must_text ? 'flex-[1.5]' : 'flex-1'}>
-                <p className="mb-1 text-[11px] font-bold text-slate-600">เกณฑ์การพัฒนาต่อเนื่อง</p>
-                <div className={`grid gap-1.5 ${topic.allow_na ? 'grid-cols-4' : 'grid-cols-3'}`}>
-                  {([0, 1, 2] as ScoreValue[]).map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      disabled={readOnly}
-                      onClick={() => applyScore(v)}
-                      className={`rounded-xl border-2 py-2 text-sm font-bold ${!isNa && score === v ? SCORE_COLOR[v] : 'border-slate-300 text-slate-500'}`}
-                    >
-                      {v}
-                    </button>
-                  ))}
-                  {topic.allow_na && (
-                    <button
-                      type="button"
-                      disabled={readOnly}
-                      onClick={applyNa}
-                      className={`rounded-xl border-2 py-2 text-xs font-bold ${isNa ? 'border-sky-600 bg-sky-500 text-white' : 'border-slate-300 text-slate-500'}`}
-                    >
-                      N/A
-                    </button>
-                  )}
-                </div>
-                {teamScore?.updated_by && answered && (
-                  <p className="mt-1 truncate text-[10px] text-slate-400">
-                    {teamScore.updated_at && `${formatEntryTime(teamScore.updated_at)} `}
-                    {editorName(teamScore.updated_by)}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
 
           <div className="mt-4">
             <p className="mb-1 text-sm font-semibold text-slate-600">เหตุผล / บันทึกเพิ่มเติม (ช่วยกันคอมเมนต์ได้)</p>
@@ -673,6 +597,80 @@ export default function TeamTopicScoreCard({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Sticky action bar: pinned to the bottom of the screen while
+              scrolling through this topic's own content above, then
+              releases back into normal flow once scroll reaches its real
+              position here — letting the next topic's bar take over. The
+              small code/name line exists because by the time it's pinned,
+              the topic header up top is usually long scrolled out of view. */}
+          <div className="sticky bottom-0 z-10 -mx-4 mt-2 border-t border-slate-200 bg-white/95 px-4 pt-2 pb-2.5 backdrop-blur">
+            <p className="mb-1 truncate text-[10px] font-medium text-slate-400">
+              {topic.code} · {topic.name_th}
+            </p>
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <p className="mb-1 text-[11px] font-bold text-slate-600">มาตรฐานพื้นฐาน</p>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => applyMustPass(false)}
+                    className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold ${mustPass === false ? 'border-red-600 bg-red-500 text-white' : 'border-slate-300 text-slate-500'}`}
+                  >
+                    ✗ ไม่ผ่าน
+                  </button>
+                  <button
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => applyMustPass(true)}
+                    className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold ${mustPass === true ? 'border-emerald-600 bg-emerald-500 text-white' : 'border-slate-300 text-slate-500'}`}
+                  >
+                    ✓ ผ่าน
+                  </button>
+                </div>
+                {teamScore?.must_pass_updated_by && mustPass !== null && (
+                  <p className="mt-1 truncate text-[10px] text-slate-400">
+                    {teamScore.must_pass_updated_at && `${formatEntryTime(teamScore.must_pass_updated_at)} `}
+                    {editorName(teamScore.must_pass_updated_by)}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex-[1.5]">
+                <p className="mb-1 text-[11px] font-bold text-slate-600">เกณฑ์การพัฒนาต่อเนื่อง</p>
+                <div className={`grid gap-1.5 ${topic.allow_na ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                  {([0, 1, 2] as ScoreValue[]).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      disabled={readOnly}
+                      onClick={() => applyScore(v)}
+                      className={`rounded-xl border-2 py-2 text-sm font-bold ${!isNa && score === v ? SCORE_COLOR[v] : 'border-slate-300 text-slate-500'}`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                  {topic.allow_na && (
+                    <button
+                      type="button"
+                      disabled={readOnly}
+                      onClick={applyNa}
+                      className={`rounded-xl border-2 py-2 text-xs font-bold ${isNa ? 'border-sky-600 bg-sky-500 text-white' : 'border-slate-300 text-slate-500'}`}
+                    >
+                      N/A
+                    </button>
+                  )}
+                </div>
+                {teamScore?.updated_by && answered && (
+                  <p className="mt-1 truncate text-[10px] text-slate-400">
+                    {teamScore.updated_at && `${formatEntryTime(teamScore.updated_at)} `}
+                    {editorName(teamScore.updated_by)}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
 
           {saving && <p className="mt-2 text-xs text-slate-400">กำลังบันทึก...</p>}

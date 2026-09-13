@@ -355,7 +355,10 @@ export default function ScoreForm() {
         onClick={() => goToTopic(topic.id, parentBlockId)}
         className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] font-bold text-slate-600 hover:bg-slate-50"
       >
-        <span className="truncate font-mono font-medium text-slate-400">{topic.code}</span>
+        <span className="min-w-0 flex-1 truncate">
+          <span className="font-mono font-medium text-slate-400">{topic.code}</span>
+          {topic.short_name && <span className="text-slate-600"> {topic.short_name}</span>}
+        </span>
         <span className="flex shrink-0 items-center gap-1">
           {mustLabel !== null && <span className={mustClass}>{mustLabel}</span>}
           <span className={ciClass}>| {ciLabel}</span>

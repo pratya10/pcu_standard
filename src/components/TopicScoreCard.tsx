@@ -289,7 +289,7 @@ export default function TopicScoreCard({
 
           {topic.must_text && (
             <div className="mb-4 rounded-lg border-2 border-amber-400 bg-amber-50 p-3">
-              <p className="mb-2 text-base font-bold text-amber-900">⚠ เกณฑ์ The Must (ต้องมี)</p>
+              <p className="mb-2 text-base font-bold text-amber-900">⚠ เกณฑ์มาตรฐานพื้นฐาน (The Must | ต้องมี)</p>
               {itemsByLevel['-1'].length > 0 ? (
                 renderChecklist(itemsByLevel['-1'])
               ) : (
