@@ -428,8 +428,14 @@ export default function ScoreForm() {
               style={{ width: `${flatTopics.length ? (answeredCount / flatTopics.length) * 100 : 0}%` }}
             />
           </div>
-          <p className="mt-1.5 text-[11px] text-slate-400">
-            Save อัตโนมัติ{collaborative && ' | การประเมินแบบทีม'}
+          <p className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-400">
+            <Icon name="save" className="!text-sm" /> Save อัตโนมัติ
+            {collaborative && (
+              <>
+                {' | '}
+                <Icon name="groups" className="!text-sm" /> การประเมินแบบทีม
+              </>
+            )}
           </p>
           {online.length > 0 && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
