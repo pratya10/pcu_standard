@@ -212,7 +212,7 @@ export default function Report() {
     <div
       ref={printAreaRef}
       className={`mx-auto max-w-3xl px-6 py-8 print:px-0 print:py-0 ${
-        printMode === 'summary' ? 'print:flex print:min-h-[267mm] print:flex-col print:justify-between' : ''
+        printMode === 'summary' ? 'print:flex print:min-h-[273mm] print:flex-col print:justify-between' : ''
       }`}
     >
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -276,12 +276,12 @@ export default function Report() {
       </div>
 
       <div className="mb-6 text-center print:mb-0">
-        <BrandLogo className="mx-auto mb-3 h-[83px] w-auto object-contain print:mb-2 print:h-16" />
-        <h1 className="text-xl font-bold text-slate-800 print:text-lg">รายงานผลการประเมินมาตรฐานหน่วยบริการปฐมภูมิ</h1>
-        <p className="text-sm text-slate-500 print:text-xs">{standard.standardVersion.name}</p>
+        <BrandLogo className="mx-auto mb-3 h-[83px] w-auto object-contain print:mb-1 print:h-11" />
+        <h1 className="text-xl font-bold text-slate-800 print:text-sm">รายงานผลการประเมินมาตรฐานหน่วยบริการปฐมภูมิ</h1>
+        <p className="text-sm text-slate-500 print:text-[10px]">{standard.standardVersion.name}</p>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-x-6 gap-y-1 rounded-xl border border-slate-200 p-4 text-sm print:mb-0 print:gap-y-1 print:p-3 print:text-[11px]">
+      <div className="mb-6 grid grid-cols-2 gap-x-6 gap-y-1 rounded-xl border border-slate-200 p-4 text-sm print:mb-0 print:gap-y-0 print:p-2 print:text-[9.5px]">
         <p>
           <span className="text-slate-500">หน่วยบริการ: </span>
           {facility?.name}
@@ -310,16 +310,16 @@ export default function Report() {
           const catTotal = catTopics.reduce((sum, t) => sum + (aggregates.get(t.id)?.avgScore ?? 0), 0)
           const catPass = catTopics.every((t) => aggregates.get(t.id)?.mustPassFinal !== false)
           return (
-            <div key={cat.id} className="mb-6 break-inside-avoid print:mb-2">
-              <h2 className="mb-2 text-sm font-bold text-slate-800 print:mb-1 print:text-[11px]">
+            <div key={cat.id} className="mb-6 break-inside-avoid print:mb-1">
+              <h2 className="mb-2 text-sm font-bold text-slate-800 print:mb-0.5 print:text-[9px]">
                 หมวดที่ {cat.code} · {cat.name_th}
               </h2>
-              <table className="w-full border-collapse text-sm print:text-[9px] print:leading-snug">
+              <table className="w-full border-collapse text-sm print:text-[7.5px] print:leading-tight">
                 <thead>
-                  <tr className="border-b border-slate-300 text-left text-xs text-slate-500 print:text-[8.5px]">
-                    <th className="py-1 pr-2 print:py-0.5">หัวข้อ</th>
-                    <th className="py-1 pr-2 text-center print:py-0.5">The Must</th>
-                    <th className="py-1 pr-2 text-center print:py-0.5">คะแนน (0-2)</th>
+                  <tr className="border-b border-slate-300 text-left text-xs text-slate-500 print:text-[7px]">
+                    <th className="py-1 pr-2 print:py-0">หัวข้อ</th>
+                    <th className="py-1 pr-2 text-center print:py-0">The Must</th>
+                    <th className="py-1 pr-2 text-center print:py-0">คะแนน (0-2)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -327,20 +327,20 @@ export default function Report() {
                     const agg = aggregates.get(t.id)
                     return (
                       <tr key={t.id} className="border-b border-slate-100">
-                        <td className="py-1 pr-2 print:py-0.5">
-                          <span className="font-mono text-xs text-slate-400 print:text-[8.5px]">{t.code}</span> {t.name_th}
+                        <td className="py-1 pr-2 print:py-0">
+                          <span className="font-mono text-xs text-slate-400 print:text-[7px]">{t.code}</span> {t.name_th}
                         </td>
-                        <td className="py-1 pr-2 text-center print:py-0.5">
+                        <td className="py-1 pr-2 text-center print:py-0">
                           {agg?.mustPassFinal === null || agg?.mustPassFinal === undefined ? '-' : agg.mustPassFinal ? 'ผ่าน' : 'ไม่ผ่าน'}
                         </td>
-                        <td className="py-1 pr-2 text-center font-semibold print:py-0.5">{formatAvg(agg?.avgScore ?? null)}</td>
+                        <td className="py-1 pr-2 text-center font-semibold print:py-0">{formatAvg(agg?.avgScore ?? null)}</td>
                       </tr>
                     )
                   })}
                   <tr className="font-semibold text-slate-800">
-                    <td className="py-1 pr-2 print:py-0.5">รวม</td>
-                    <td className="py-1 pr-2 text-center print:py-0.5">{catPass ? 'ผ่าน' : 'ไม่ผ่าน'}</td>
-                    <td className="py-1 pr-2 text-center print:py-0.5">{catTotal.toFixed(1)}</td>
+                    <td className="py-1 pr-2 print:py-0">รวม</td>
+                    <td className="py-1 pr-2 text-center print:py-0">{catPass ? 'ผ่าน' : 'ไม่ผ่าน'}</td>
+                    <td className="py-1 pr-2 text-center print:py-0">{catTotal.toFixed(1)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -425,21 +425,21 @@ export default function Report() {
         </div>
       )}
 
-      <div className="mb-8 rounded-xl border-2 border-slate-800 p-4 text-center print:mb-0 print:border print:border-slate-800 print:p-3">
-        <p className="text-sm text-slate-500 print:text-xs">สรุปผลการประเมินภาพรวม</p>
-        <p className="text-3xl font-bold text-slate-800 print:text-xl">{grandTotal.toFixed(1)} คะแนน</p>
-        <p className={`text-sm font-semibold print:text-xs ${overallPass ? 'text-emerald-600' : 'text-red-600'}`}>
+      <div className="mb-8 rounded-xl border-2 border-slate-800 p-4 text-center print:mb-0 print:border print:border-slate-800 print:p-2">
+        <p className="text-sm text-slate-500 print:text-[10px]">สรุปผลการประเมินภาพรวม</p>
+        <p className="text-3xl font-bold text-slate-800 print:text-base">{grandTotal.toFixed(1)} คะแนน</p>
+        <p className={`text-sm font-semibold print:text-[10px] ${overallPass ? 'text-emerald-600' : 'text-red-600'}`}>
           {overallPass ? 'ผ่านเกณฑ์ The Must ครบทุกหัวข้อ' : `ไม่ผ่านเกณฑ์ The Must จำนวน ${mustFailTopics.length} หัวข้อ`}
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-8 pt-8 text-center text-sm print:gap-8 print:pt-0 print:text-xs">
+      <div className="grid grid-cols-2 gap-8 pt-8 text-center text-sm print:gap-6 print:pt-0 print:text-[10px]">
         <div>
-          <p className="mb-8 print:mb-6">ลงชื่อ .............................................</p>
+          <p className="mb-8 print:mb-4">ลงชื่อ .............................................</p>
           <p>ประธานคณะกรรมการประเมิน</p>
         </div>
         <div>
-          <p className="mb-8 print:mb-6">ลงชื่อ .............................................</p>
+          <p className="mb-8 print:mb-4">ลงชื่อ .............................................</p>
           <p>ผู้อำนวยการหน่วยบริการ</p>
         </div>
       </div>
