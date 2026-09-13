@@ -1,5 +1,6 @@
 import {
   AlignmentType,
+  BorderStyle,
   Document,
   HeadingLevel,
   ImageRun,
@@ -35,6 +36,18 @@ export type ReportDocxInput = {
 // heavily-photographed round doesn't produce an unreasonably large .docx.
 const MAX_IMAGES_PER_TOPIC = 6
 const MAX_IMAGES_TOTAL = 60
+
+// No outer box, no column rule — just a dotted line between rows, matching
+// the plain "line-item list" look the printed/on-screen report also uses.
+const NO_BORDER = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' } as const
+const DOTTED_ROW_BORDERS = {
+  top: NO_BORDER,
+  bottom: NO_BORDER,
+  left: NO_BORDER,
+  right: NO_BORDER,
+  insideVertical: NO_BORDER,
+  insideHorizontal: { style: BorderStyle.DOTTED, size: 4, color: 'auto' },
+} as const
 
 type LogoAsset = {
   data: Uint8Array
@@ -208,9 +221,15 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
   children.push(
     new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
+      borders: DOTTED_ROW_BORDERS,
       rows: [
         new TableRow({ children: [cell('หน่วยบริการ', { bold: true, width: 30 }), cell(facility?.name ?? '-', { width: 70 })] }),
-        new TableRow({ children: [cell('รหัสหน่วยบริการ', { bold: true }), cell(facility?.code ?? '-')] }),
+        new TableRow({
+          children: [
+            cell('รหัสหน่วยบริการปฐมภูมิ', { bold: true }),
+            cell(`${facility?.pcu_code ?? '-'} ( รหัสสถานพยาบาล ${facility?.code ?? '-'} )`),
+          ],
+        }),
         new TableRow({ children: [cell('รอบการประเมิน', { bold: true }), cell(round.name)] }),
         new TableRow({ children: [cell('วันที่ประเมิน', { bold: true }), cell(formatThaiDate(round.survey_date))] }),
         new TableRow({
@@ -280,7 +299,7 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
       }),
     )
 
-    children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows }), new Paragraph({ text: '' }))
+    children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, borders: DOTTED_ROW_BORDERS, rows }), new Paragraph({ text: '' }))
   }
 
   const overallPass = mustFailCount === 0
@@ -291,7 +310,7 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: `${grandTotal.toFixed(1)} คะแนน`, bold: true, size: 32 })],
+      children: [new TextRun({ text: `${Math.round(grandTotal)} คะแนน`, bold: true, size: 32 })],
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
