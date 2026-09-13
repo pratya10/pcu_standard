@@ -28,10 +28,6 @@ export default function AdminLogin() {
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/pcustandard71/admin`,
-        // Restricts sign-in to Google Workspace accounts on this domain.
-        // Harmless to leave in even if mshprimary.com isn't a Workspace
-        // domain — remove this line if you want any Google account to work.
-        queryParams: { hd: 'mshprimary.com' },
       },
     })
     if (error) setError('เข้าสู่ระบบด้วย Google ไม่สำเร็จ: ' + error.message)
