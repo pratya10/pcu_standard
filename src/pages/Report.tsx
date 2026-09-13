@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { loadStandardByVersionId, allTopicsFlat } from '../lib/loadStandard'
 import { fetchScoresForRound } from '../lib/scoresApi'
 import { aggregateAll, formatAvg } from '../lib/aggregate'
-import type { AssessmentRound, FullStandard, Facility, Participant, Score } from '../types'
+import type { AssessmentRound, FullStandard, Facility, Participant, Score, TopicPhoto } from '../types'
 import BrandLogo from '../components/BrandLogo'
 import { downloadBlob, generateReportDocx } from '../lib/docxExport'
 import { formatThaiDate } from '../lib/thaiDate'
+import { getTopicPhotoUrl, listRoundPhotos } from '../lib/topicPhotos'
 
 export default function Report() {
   const { roundId } = useParams<{ roundId: string }>()
@@ -16,7 +17,9 @@ export default function Report() {
   const [standard, setStandard] = useState<FullStandard | null>(null)
   const [scores, setScores] = useState<Score[]>([])
   const [participants, setParticipants] = useState<Participant[]>([])
+  const [photos, setPhotos] = useState<TopicPhoto[]>([])
   const [loading, setLoading] = useState(true)
+  const [printMode, setPrintMode] = useState<'summary' | 'detailed'>('summary')
 
   useEffect(() => {
     if (!roundId) return
@@ -28,25 +31,60 @@ export default function Report() {
         setLoading(false)
         return
       }
-      const [std, sc, { data: fac }, { data: parts }] = await Promise.all([
+      const [std, sc, { data: fac }, { data: parts }, ph] = await Promise.all([
         loadStandardByVersionId(roundRow.standard_version_id),
         fetchScoresForRound(rid),
         supabase.from('facilities').select('*').eq('id', roundRow.facility_id).single(),
         supabase.from('participants').select('*').eq('round_id', rid).order('joined_at'),
+        listRoundPhotos(rid),
       ])
       setRound(roundRow as AssessmentRound)
       setStandard(std)
       setScores(sc)
       setFacility((fac as Facility) ?? null)
       setParticipants((parts as Participant[]) ?? [])
+      setPhotos(ph)
       setLoading(false)
     }
     load()
   }, [roundId])
 
+  useEffect(() => {
+    function resetAfterPrint() {
+      setPrintMode('summary')
+    }
+    window.addEventListener('afterprint', resetAfterPrint)
+    return () => window.removeEventListener('afterprint', resetAfterPrint)
+  }, [])
+
+  function printDetailed() {
+    setPrintMode('detailed')
+    requestAnimationFrame(() => requestAnimationFrame(() => window.print()))
+  }
+
+  function printSummary() {
+    setPrintMode('summary')
+    requestAnimationFrame(() => requestAnimationFrame(() => window.print()))
+  }
+
   const flatTopics = useMemo(() => (standard ? allTopicsFlat(standard) : []), [standard])
   const aggregates = useMemo(() => aggregateAll(flatTopics.map((t) => t.id), scores), [flatTopics, scores])
   const evaluators = participants.filter((p) => p.role !== 'viewer')
+  const evaluatorNameById = useMemo(() => new Map(participants.map((p) => [p.id, p.name])), [participants])
+  const photosByTopic = useMemo(() => {
+    const map = new Map<string, TopicPhoto[]>()
+    for (const p of photos) {
+      const list = map.get(p.topic_id) ?? []
+      list.push(p)
+      map.set(p.topic_id, list)
+    }
+    return map
+  }, [photos])
+  const itemTextById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const t of flatTopics) for (const it of t.scoreItems) map.set(it.id, it.item_text)
+    return map
+  }, [flatTopics])
   const [exportingDocx, setExportingDocx] = useState<'with' | 'without' | null>(null)
 
   async function exportDocx(includeComments: boolean) {
@@ -62,6 +100,7 @@ export default function Report() {
         grandTotal: flatTopics.reduce((sum, t) => sum + (aggregates.get(t.id)?.avgScore ?? 0), 0),
         mustFailCount: flatTopics.filter((t) => aggregates.get(t.id)?.mustPassFinal === false).length,
         includeComments,
+        photosByTopic: includeComments ? photosByTopic : undefined,
       })
       const suffix = includeComments ? 'with-comments' : 'no-comments'
       downloadBlob(blob, `pcu-report-${round.join_code}-${suffix}.docx`)
@@ -107,27 +146,52 @@ export default function Report() {
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-8 print:px-0 print:py-0">
-      <div className="no-print mb-6 flex justify-end gap-2">
-        <button onClick={exportCsv} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600">
-          ดาวน์โหลด CSV
-        </button>
-        <button
-          onClick={() => exportDocx(false)}
-          disabled={exportingDocx !== null}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
-        >
-          {exportingDocx === 'without' ? 'กำลังสร้างไฟล์...' : 'ดาวน์โหลด Word (ไม่มี comment)'}
-        </button>
-        <button
-          onClick={() => exportDocx(true)}
-          disabled={exportingDocx !== null}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
-        >
-          {exportingDocx === 'with' ? 'กำลังสร้างไฟล์...' : 'ดาวน์โหลด Word (มี comment)'}
-        </button>
-        <button onClick={() => window.print()} className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white">
-          พิมพ์ / บันทึกเป็น PDF
-        </button>
+      <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-2">
+          <Link to={`/round/${roundId}/score`} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600">
+            ← กลับสู่การประเมิน
+          </Link>
+          <Link to="/admin" className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600">
+            ไปหน้าแอดมิน
+          </Link>
+        </div>
+      </div>
+
+      <div className="no-print mb-6 flex flex-wrap gap-3">
+        <div className="rounded-xl border border-slate-200 p-3">
+          <p className="mb-2 text-xs font-semibold text-slate-400">สรุปภาพรวม</p>
+          <div className="flex gap-2">
+            <button onClick={printSummary} className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white">
+              PDF
+            </button>
+            <button
+              onClick={() => exportDocx(false)}
+              disabled={exportingDocx !== null}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
+            >
+              {exportingDocx === 'without' ? 'กำลังสร้าง...' : 'Word'}
+            </button>
+            <button onClick={exportCsv} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600">
+              Excel (CSV)
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 p-3">
+          <p className="mb-2 text-xs font-semibold text-slate-400">แบบละเอียด (มี comment + รูป)</p>
+          <div className="flex gap-2">
+            <button onClick={printDetailed} className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white">
+              PDF
+            </button>
+            <button
+              onClick={() => exportDocx(true)}
+              disabled={exportingDocx !== null}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
+            >
+              {exportingDocx === 'with' ? 'กำลังสร้าง...' : 'Word'}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="mb-6 text-center">
@@ -159,48 +223,106 @@ export default function Report() {
         </p>
       </div>
 
-      {standard.categories.map((cat) => {
-        const catTopics = [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
-        const catTotal = catTopics.reduce((sum, t) => sum + (aggregates.get(t.id)?.avgScore ?? 0), 0)
-        const catPass = catTopics.every((t) => aggregates.get(t.id)?.mustPassFinal !== false)
-        return (
-          <div key={cat.id} className="mb-6 break-inside-avoid">
-            <h2 className="mb-2 text-sm font-bold text-slate-800">
-              หมวดที่ {cat.code} · {cat.name_th}
-            </h2>
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-slate-300 text-left text-xs text-slate-500">
-                  <th className="py-1 pr-2">หัวข้อ</th>
-                  <th className="py-1 pr-2 text-center">The Must</th>
-                  <th className="py-1 pr-2 text-center">คะแนน (0-2)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {catTopics.map((t) => {
-                  const agg = aggregates.get(t.id)
-                  return (
-                    <tr key={t.id} className="border-b border-slate-100">
-                      <td className="py-1 pr-2">
-                        <span className="font-mono text-xs text-slate-400">{t.code}</span> {t.name_th}
-                      </td>
-                      <td className="py-1 pr-2 text-center">
-                        {agg?.mustPassFinal === null || agg?.mustPassFinal === undefined ? '-' : agg.mustPassFinal ? 'ผ่าน' : 'ไม่ผ่าน'}
-                      </td>
-                      <td className="py-1 pr-2 text-center font-semibold">{formatAvg(agg?.avgScore ?? null)}</td>
-                    </tr>
-                  )
-                })}
-                <tr className="font-semibold text-slate-800">
-                  <td className="py-1 pr-2">รวม</td>
-                  <td className="py-1 pr-2 text-center">{catPass ? 'ผ่าน' : 'ไม่ผ่าน'}</td>
-                  <td className="py-1 pr-2 text-center">{catTotal.toFixed(1)}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )
-      })}
+      <div className={printMode === 'detailed' ? 'hidden' : ''}>
+        {standard.categories.map((cat) => {
+          const catTopics = [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
+          const catTotal = catTopics.reduce((sum, t) => sum + (aggregates.get(t.id)?.avgScore ?? 0), 0)
+          const catPass = catTopics.every((t) => aggregates.get(t.id)?.mustPassFinal !== false)
+          return (
+            <div key={cat.id} className="mb-6 break-inside-avoid">
+              <h2 className="mb-2 text-sm font-bold text-slate-800">
+                หมวดที่ {cat.code} · {cat.name_th}
+              </h2>
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-slate-300 text-left text-xs text-slate-500">
+                    <th className="py-1 pr-2">หัวข้อ</th>
+                    <th className="py-1 pr-2 text-center">The Must</th>
+                    <th className="py-1 pr-2 text-center">คะแนน (0-2)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {catTopics.map((t) => {
+                    const agg = aggregates.get(t.id)
+                    return (
+                      <tr key={t.id} className="border-b border-slate-100">
+                        <td className="py-1 pr-2">
+                          <span className="font-mono text-xs text-slate-400">{t.code}</span> {t.name_th}
+                        </td>
+                        <td className="py-1 pr-2 text-center">
+                          {agg?.mustPassFinal === null || agg?.mustPassFinal === undefined ? '-' : agg.mustPassFinal ? 'ผ่าน' : 'ไม่ผ่าน'}
+                        </td>
+                        <td className="py-1 pr-2 text-center font-semibold">{formatAvg(agg?.avgScore ?? null)}</td>
+                      </tr>
+                    )
+                  })}
+                  <tr className="font-semibold text-slate-800">
+                    <td className="py-1 pr-2">รวม</td>
+                    <td className="py-1 pr-2 text-center">{catPass ? 'ผ่าน' : 'ไม่ผ่าน'}</td>
+                    <td className="py-1 pr-2 text-center">{catTotal.toFixed(1)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )
+        })}
+      </div>
+
+      {printMode === 'detailed' && (
+        <div>
+          {standard.categories.map((cat) => {
+            const catTopics = [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
+            return (
+              <div key={cat.id} className="mb-6 break-inside-avoid">
+                <h2 className="mb-2 text-sm font-bold text-slate-800">
+                  หมวดที่ {cat.code} · {cat.name_th}
+                </h2>
+                <div className="flex flex-col gap-4">
+                  {catTopics.map((t) => {
+                    const agg = aggregates.get(t.id)
+                    const topicPhotos = photosByTopic.get(t.id) ?? []
+                    const commentLines: string[] = []
+                    for (const s of agg?.scores ?? []) {
+                      const name = evaluatorNameById.get(s.participant_id) ?? 'กรรมการ'
+                      if (s.comment) commentLines.push(`${name}: ${s.comment}`)
+                      for (const [itemId, note] of Object.entries(s.item_notes ?? {})) {
+                        if (note.comment) commentLines.push(`${name} (${itemTextById.get(itemId) ?? itemId}): ${note.comment}`)
+                      }
+                    }
+                    if (commentLines.length === 0 && topicPhotos.length === 0) return null
+                    return (
+                      <div key={t.id} className="break-inside-avoid rounded-lg border border-slate-200 p-3 text-sm">
+                        <p className="mb-1 font-semibold text-slate-800">
+                          <span className="font-mono text-xs text-slate-400">{t.code}</span> {t.name_th}
+                        </p>
+                        {commentLines.length > 0 && (
+                          <ul className="mb-2 list-disc pl-5 text-slate-600">
+                            {commentLines.map((line, i) => (
+                              <li key={i}>{line}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {topicPhotos.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {topicPhotos.map((p) => (
+                              <img
+                                key={p.id}
+                                src={getTopicPhotoUrl(p.file_path)}
+                                alt={p.file_name ?? ''}
+                                className="h-20 w-20 rounded-md border border-slate-200 object-cover"
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       <div className="mb-8 rounded-xl border-2 border-slate-800 p-4 text-center">
         <p className="text-sm text-slate-500">สรุปผลการประเมินภาพรวม</p>

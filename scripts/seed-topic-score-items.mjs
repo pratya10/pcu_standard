@@ -1,6 +1,7 @@
 // Seeds the per-topic checklist items (topic_score_items) used by the
-// itemized checklist UI. Run AFTER seed-standard.mjs and AFTER migration
-// 0009_topic_checklists_and_evidence.sql has been applied.
+// itemized checklist UI: Must criteria (-1), evidence (-2, pulled from the
+// standard's `evidence` arrays), and Continuous Improvement criteria (0-2).
+// Run AFTER seed-standard.mjs and AFTER migrations 0009-0011 have been applied.
 // Usage: SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/seed-topic-score-items.mjs
 import { createClient } from '@supabase/supabase-js'
 import { readFileSync } from 'node:fs'
@@ -18,11 +19,27 @@ if (!url || !key) {
 
 const supabase = createClient(url, key)
 
-const dataPath = join(__dirname, '..', 'supabase', 'seed', 'topic-score-items.json')
-const data = JSON.parse(readFileSync(dataPath, 'utf-8'))
+const itemsPath = join(__dirname, '..', 'supabase', 'seed', 'topic-score-items.json')
+const standardPath = join(__dirname, '..', 'supabase', 'seed', 'standard-2571-2573.json')
+const itemsData = JSON.parse(readFileSync(itemsPath, 'utf-8'))
+const standardData = JSON.parse(readFileSync(standardPath, 'utf-8'))
+
+// Merge in each topic's `evidence` array as score_level -2 checklist items.
+const byCode = { ...itemsData }
+function collectEvidence(topics) {
+  for (const t of topics ?? []) {
+    const evidence = t.evidence ?? []
+    if (evidence.length === 0) continue
+    byCode[t.code] = { ...(byCode[t.code] ?? {}), '-2': evidence }
+  }
+}
+for (const cat of standardData.categories) {
+  collectEvidence(cat.topics)
+  for (const g of cat.groups ?? []) collectEvidence(g.topics)
+}
 
 async function main() {
-  for (const [topicCode, byLevel] of Object.entries(data)) {
+  for (const [topicCode, byLevel] of Object.entries(byCode)) {
     const { data: topicRow, error: topicErr } = await supabase
       .from('topics')
       .select('id')

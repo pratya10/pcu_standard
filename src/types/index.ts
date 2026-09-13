@@ -71,7 +71,7 @@ export type TopicEvidenceItem = {
 export type TopicScoreItem = {
   id: string
   topic_id: string
-  score_level: 0 | 1 | 2
+  score_level: -1 | 0 | 1 | 2
   item_text: string
   sort_order: number
 }
@@ -80,6 +80,7 @@ export type TopicPhoto = {
   id: string
   round_id: string
   topic_id: string
+  item_id: string | null
   uploaded_by: string | null
   file_path: string
   file_name: string | null

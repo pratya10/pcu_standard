@@ -12,9 +12,10 @@ import {
   WidthType,
 } from 'docx'
 import { getLogoUrl } from './branding'
+import { getTopicPhotoUrl } from './topicPhotos'
 import { formatAvg, type TopicAggregate } from './aggregate'
 import { formatThaiDate } from './thaiDate'
-import type { AssessmentRound, Facility, FullStandard, Participant, Topic, TopicEvidenceItem, TopicScoreItem } from '../types'
+import type { AssessmentRound, Facility, FullStandard, Participant, Topic, TopicEvidenceItem, TopicPhoto, TopicScoreItem } from '../types'
 
 type TopicWithEvidence = Topic & { evidence: TopicEvidenceItem[]; scoreItems: TopicScoreItem[] }
 
@@ -27,7 +28,13 @@ export type ReportDocxInput = {
   grandTotal: number
   mustFailCount: number
   includeComments?: boolean
+  photosByTopic?: Map<string, TopicPhoto[]>
 }
+
+// Caps how many photos get embedded per topic / for the whole document, so a
+// heavily-photographed round doesn't produce an unreasonably large .docx.
+const MAX_IMAGES_PER_TOPIC = 6
+const MAX_IMAGES_TOTAL = 60
 
 type LogoAsset = {
   data: Uint8Array
@@ -45,10 +52,11 @@ const CONTENT_TYPE_MAP: Record<string, LogoAsset['type']> = {
 }
 
 const TARGET_LOGO_WIDTH = 340 // px, ~30% larger than the previous fixed size
+const TARGET_PHOTO_WIDTH = 110 // px, small inline thumbnail for evidence photos
 
-async function tryFetchLogo(): Promise<LogoAsset | null> {
+async function tryFetchImage(url: string): Promise<LogoAsset | null> {
   try {
-    const res = await fetch(getLogoUrl())
+    const res = await fetch(url)
     if (!res.ok) return null
     const type = CONTENT_TYPE_MAP[res.headers.get('content-type') ?? '']
     // docx's ImageRun only embeds jpg/png/gif/bmp directly; skip anything
@@ -67,8 +75,8 @@ async function tryFetchLogo(): Promise<LogoAsset | null> {
   }
 }
 
-function scaledLogoSize(natural: { width: number; height: number }) {
-  const width = TARGET_LOGO_WIDTH
+function scaledSize(natural: { width: number; height: number }, targetWidth: number) {
+  const width = targetWidth
   const height = Math.round((natural.height / natural.width) * width)
   return { width, height }
 }
@@ -103,16 +111,27 @@ function categoryTopics(cat: FullStandard['categories'][number]): TopicWithEvide
   return [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
 }
 
-function commentCell(lines: string[]) {
+function commentCell(lines: string[], images: LogoAsset[]) {
+  const paragraphs = lines.map(
+    (line) =>
+      new Paragraph({
+        children: [new TextRun({ text: line, italics: true, size: 20, color: '475569' })],
+      }),
+  )
+  if (images.length) {
+    paragraphs.push(
+      new Paragraph({
+        children: images.flatMap((img, i) => [
+          new ImageRun({ data: img.data, transformation: scaledSize(img, TARGET_PHOTO_WIDTH), type: img.type }),
+          ...(i < images.length - 1 ? [new TextRun({ text: '  ' })] : []),
+        ]),
+      }),
+    )
+  }
   return new TableCell({
     columnSpan: 3,
     shading: { fill: 'F8FAFC' },
-    children: lines.map(
-      (line) =>
-        new Paragraph({
-          children: [new TextRun({ text: line, italics: true, size: 20, color: '475569' })],
-        }),
-    ),
+    children: paragraphs,
   })
 }
 
@@ -133,10 +152,29 @@ function buildCommentLines(agg: TopicAggregate | undefined, topic: TopicWithEvid
   return lines
 }
 
+async function fetchTopicPhotoAssets(
+  topic: TopicWithEvidence,
+  photosByTopic: Map<string, TopicPhoto[]> | undefined,
+  imagesLeftTotal: { count: number },
+): Promise<LogoAsset[]> {
+  const photos = (photosByTopic?.get(topic.id) ?? []).slice(0, MAX_IMAGES_PER_TOPIC)
+  const assets: LogoAsset[] = []
+  for (const p of photos) {
+    if (imagesLeftTotal.count <= 0) break
+    const asset = await tryFetchImage(getTopicPhotoUrl(p.file_path))
+    if (asset) {
+      assets.push(asset)
+      imagesLeftTotal.count--
+    }
+  }
+  return assets
+}
+
 export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> {
-  const { round, facility, standard, aggregates, evaluators, grandTotal, mustFailCount, includeComments } = input
+  const { round, facility, standard, aggregates, evaluators, grandTotal, mustFailCount, includeComments, photosByTopic } = input
   const evaluatorNameById = new Map(evaluators.map((e) => [e.id, e.name]))
-  const logo = await tryFetchLogo()
+  const imagesLeftTotal = { count: MAX_IMAGES_TOTAL }
+  const logo = await tryFetchImage(getLogoUrl())
 
   const children: (Paragraph | Table)[] = []
 
@@ -144,7 +182,7 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
     children.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new ImageRun({ data: logo.data, transformation: scaledLogoSize(logo), type: logo.type })],
+        children: [new ImageRun({ data: logo.data, transformation: scaledSize(logo, TARGET_LOGO_WIDTH), type: logo.type })],
       }),
     )
   }
@@ -214,8 +252,9 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
       )
       if (includeComments) {
         const commentLines = buildCommentLines(agg, t, evaluatorNameById)
-        if (commentLines.length) {
-          rows.push(new TableRow({ children: [commentCell(commentLines)] }))
+        const images = await fetchTopicPhotoAssets(t, photosByTopic, imagesLeftTotal)
+        if (commentLines.length || images.length) {
+          rows.push(new TableRow({ children: [commentCell(commentLines, images)] }))
         }
       }
     }
