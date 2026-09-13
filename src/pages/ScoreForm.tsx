@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabaseClient'
@@ -21,6 +21,11 @@ type Block = { id: string; navLabel: string; headerLabel: string; color: string;
 type TopSection = Block & { subSections: Block[] }
 
 const RAINBOW = ['#e11d48', '#f97316', '#eab308', '#22c55e', '#0ea5e9', '#8b5cf6']
+// Approximate rendered height of the sticky group header (single line of
+// text-sm bold + its own padding/border) — used so each topic's own mini
+// sticky header knows to sit right below it, without needing a second
+// ResizeObserver for what's normally a very stable, single-line element.
+const GROUP_HEADER_HEIGHT = 44
 
 // "Complete" just means every topic has been answered (any score/NA and any
 // Must result counts) — this is a progress indicator, not a perfect-score one.
@@ -47,9 +52,28 @@ export default function ScoreForm() {
   const [navOpen, setNavOpen] = useState(false)
   const [online, setOnline] = useState<PresenceInfo[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
+  const [headerHeight, setHeaderHeight] = useState(0)
+  const headerRef = useRef<HTMLDivElement>(null)
 
   const session = roundId ? getParticipantSession(roundId) : null
   const collaborative = round?.scoring_mode === 'collaborative'
+
+  // The round-info bar's own height varies (online-participant list can
+  // wrap, the read-only banner can appear/disappear), so the group headers
+  // and each topic's mini sticky header — which both need to sit right
+  // below it — measure it live instead of guessing a fixed offset.
+  useEffect(() => {
+    const el = headerRef.current
+    if (!el) return
+    const observer = new ResizeObserver(() => setHeaderHeight(el.offsetHeight))
+    observer.observe(el)
+    setHeaderHeight(el.offsetHeight)
+    return () => observer.disconnect()
+    // The round-info bar (and its ref) doesn't exist in the DOM yet while
+    // `loading` is true — re-run once it flips so the ref actually resolves
+    // to something, instead of only ever finding it null on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading])
 
   useEffect(() => {
     // Someone can be an app admin (logged in via Google separately) *and*
@@ -459,7 +483,10 @@ export default function ScoreForm() {
       )}
 
       <div className="min-w-0 flex-1">
-        <div className="sticky top-0 z-10 mb-4 -mx-4 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur md:mx-0 md:rounded-xl md:border">
+        <div
+          ref={headerRef}
+          className="sticky top-0 z-10 mb-4 -mx-4 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur md:mx-0 md:rounded-xl md:border"
+        >
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -521,7 +548,11 @@ export default function ScoreForm() {
 
         {visibleBlocks.map((s) => (
           <div key={s.id} className="mb-6">
-            <h2 id={s.id} className="mb-2 scroll-mt-40 text-sm font-bold text-slate-700">
+            <h2
+              id={s.id}
+              className="sticky z-[5] -mx-4 mb-2 scroll-mt-40 border-b border-slate-200 bg-slate-50/95 px-4 py-2 text-sm font-bold text-slate-700 backdrop-blur md:mx-0 md:rounded-t-lg"
+              style={{ top: headerHeight }}
+            >
               {s.headerLabel}
             </h2>
             <div className="mb-3 flex flex-col gap-2">
@@ -538,6 +569,7 @@ export default function ScoreForm() {
                       participantNameById={participantNameById}
                       accentColor={s.color}
                       isAdmin={isAdmin}
+                      topOffset={headerHeight + GROUP_HEADER_HEIGHT}
                       onSaved={handleTeamSaved}
                     />
                   ) : (

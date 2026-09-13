@@ -47,6 +47,7 @@ export default function TeamTopicScoreCard({
   participantNameById,
   accentColor,
   isAdmin,
+  topOffset = 0,
   onSaved,
 }: {
   topic: TopicWithEvidence
@@ -58,6 +59,9 @@ export default function TeamTopicScoreCard({
   participantNameById: Map<string, string>
   accentColor?: string
   isAdmin?: boolean
+  /** Pixels of fixed page header + group header above this card's own
+   *  sticky-top mini header needs to clear while pinned. */
+  topOffset?: number
   onSaved: (updated: TeamScore) => void
 }) {
   const confirm = useConfirm()
@@ -166,7 +170,7 @@ export default function TeamTopicScoreCard({
     if (current && current.checked !== checked) {
       const ok = await confirm({
         title: 'ยืนยันเปลี่ยนค่า',
-        message: `ข้อนี้ถูกตั้งไว้แล้วว่า "${current.checked ? 'ใช่' : 'ไม่ใช่'}" โดย ${editorName(current.checkedBy)}\nต้องการเปลี่ยนเป็น "${checked ? 'ใช่' : 'ไม่ใช่'}" หรือไม่?`,
+        message: `ข้อนี้ถูกตั้งไว้แล้วว่า "${current.checked ? 'ใช่' : 'ไม่'}" โดย ${editorName(current.checkedBy)}\nต้องการเปลี่ยนเป็น "${checked ? 'ใช่' : 'ไม่'}" หรือไม่?`,
         confirmLabel: 'ยืนยันเปลี่ยน',
       })
       if (!ok) return
@@ -482,6 +486,12 @@ export default function TeamTopicScoreCard({
 
       {open && (
         <div className="border-t border-slate-100 px-4 py-4">
+          <p
+            className="sticky z-[4] -mx-4 mb-3 truncate border-b border-slate-100 bg-white/95 px-4 py-1.5 text-xs font-medium text-slate-500 backdrop-blur"
+            style={{ top: topOffset }}
+          >
+            <span className="font-mono text-slate-400">{topic.code}</span> {topic.name_th}
+          </p>
           {topic.intent_text && (
             <p className="mb-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
               <span className="font-semibold">เจตจำนงการประเมิน: </span>
@@ -682,7 +692,7 @@ function ToggleSwitch({ checked, disabled, onChange }: { checked: boolean; disab
         checked ? 'bg-emerald-500' : 'bg-red-400'
       } disabled:opacity-60`}
     >
-      {checked ? 'ใช่' : 'ไม่ใช่'}
+      {checked ? 'ใช่' : 'ไม่'}
     </button>
   )
 }
