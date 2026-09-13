@@ -53,6 +53,25 @@ export default function ScoreForm() {
     return !!s && (s.is_na || s.score !== null)
   }).length
 
+  // Rainbow-ordered sections for the jump nav: หมวด 1, หมวด 2.1-2.4, หมวด 3.
+  const sections = useMemo(() => {
+    const list: { id: string; label: string; color: string }[] = []
+    const rainbow = ['#e11d48', '#f97316', '#eab308', '#22c55e', '#0ea5e9', '#8b5cf6']
+    let i = 0
+    for (const cat of standard?.categories ?? []) {
+      if (cat.topics.length > 0) {
+        list.push({ id: `sec-cat-${cat.id}`, label: `หมวด ${cat.code}`, color: rainbow[i % rainbow.length] })
+        i++
+      }
+      for (const g of cat.groups) {
+        list.push({ id: `sec-group-${g.id}`, label: `${g.code} ${g.name_th}`, color: rainbow[i % rainbow.length] })
+        i++
+      }
+    }
+    return list
+  }, [standard])
+  const colorById = useMemo(() => new Map(sections.map((s) => [s.id, s.color])), [sections])
+
   if (loading) return <div className="flex min-h-screen items-center justify-center text-slate-400">กำลังโหลด...</div>
   if (error || !round || !standard || !session) {
     return (
@@ -66,25 +85,6 @@ export default function ScoreForm() {
   }
 
   const readOnly = round.status === 'completed'
-
-  // Rainbow-ordered sections for the jump nav: หมวด 1, หมวด 2.1-2.4, หมวด 3.
-  const sections = useMemo(() => {
-    const list: { id: string; label: string; color: string }[] = []
-    const rainbow = ['#e11d48', '#f97316', '#eab308', '#22c55e', '#0ea5e9', '#8b5cf6']
-    let i = 0
-    for (const cat of standard.categories) {
-      if (cat.topics.length > 0) {
-        list.push({ id: `sec-cat-${cat.id}`, label: `หมวด ${cat.code}`, color: rainbow[i % rainbow.length] })
-        i++
-      }
-      for (const g of cat.groups) {
-        list.push({ id: `sec-group-${g.id}`, label: `${g.code} ${g.name_th}`, color: rainbow[i % rainbow.length] })
-        i++
-      }
-    }
-    return list
-  }, [standard])
-  const colorById = new Map(sections.map((s) => [s.id, s.color]))
 
   function scrollToSection(id: string) {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
