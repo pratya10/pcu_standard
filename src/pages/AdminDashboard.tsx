@@ -118,17 +118,17 @@ export default function AdminDashboard() {
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-          <table className="w-full min-w-[900px] border-collapse text-sm">
+          <table className="w-full min-w-max border-collapse text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs text-slate-500">
-                <th className="px-4 py-3 font-medium">ชื่อรอบ</th>
-                <th className="px-4 py-3 font-medium">หน่วยบริการ</th>
-                <th className="px-4 py-3 font-medium">รหัส PCU</th>
-                <th className="px-4 py-3 font-medium">สังกัด</th>
-                <th className="px-4 py-3 font-medium">วันที่ประเมิน</th>
-                <th className="px-4 py-3 font-medium">ประเภท</th>
-                <th className="px-4 py-3 font-medium">Join code</th>
-                <th className="px-4 py-3 font-medium">สถานะ</th>
+              <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs whitespace-nowrap text-slate-500">
+                <th className="px-3 py-2.5 font-medium">ชื่อรอบ</th>
+                <th className="px-3 py-2.5 font-medium">หน่วยบริการ</th>
+                <th className="px-3 py-2.5 font-medium">รหัส PCU</th>
+                <th className="px-3 py-2.5 font-medium">สังกัด</th>
+                <th className="px-3 py-2.5 font-medium">วันที่ประเมิน</th>
+                <th className="px-3 py-2.5 font-medium">ประเภท</th>
+                <th className="px-3 py-2.5 font-medium">Join code</th>
+                <th className="px-3 py-2.5 font-medium">สถานะ</th>
               </tr>
             </thead>
             <tbody>
@@ -136,21 +136,21 @@ export default function AdminDashboard() {
                 <tr
                   key={r.id}
                   onClick={() => navigate(`/admin/rounds/${r.id}`)}
-                  className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                  className="cursor-pointer border-b border-slate-100 whitespace-nowrap last:border-0 hover:bg-slate-50"
                 >
-                  <td className="px-4 py-3 font-semibold text-slate-800">{r.name}</td>
-                  <td className="px-4 py-3 text-slate-600">{r.facility?.name ?? '-'}</td>
-                  <td className="px-4 py-3 font-mono text-slate-500">{r.facility?.code ?? '-'}</td>
-                  <td className="px-4 py-3 text-slate-500">{r.facility?.affiliation ?? '-'}</td>
-                  <td className="px-4 py-3 text-slate-500">{formatThaiDate(r.survey_date, 'ยังไม่กำหนดวัน')}</td>
-                  <td className="px-4 py-3">
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${scoringModeColor[r.scoring_mode]}`}>
+                  <td className="px-3 py-2.5 font-semibold text-slate-800">{r.name}</td>
+                  <td className="px-3 py-2.5 text-slate-600">{r.facility?.name ?? '-'}</td>
+                  <td className="px-3 py-2.5 font-mono text-slate-500">{r.facility?.code ?? '-'}</td>
+                  <td className="px-3 py-2.5 text-slate-500">{r.facility?.affiliation ?? '-'}</td>
+                  <td className="px-3 py-2.5 text-slate-500">{formatThaiDate(r.survey_date, 'ยังไม่กำหนดวัน')}</td>
+                  <td className="px-3 py-2.5">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${scoringModeColor[r.scoring_mode]}`}>
                       {scoringModeLabel[r.scoring_mode]}
                     </span>
                   </td>
-                  <td className="px-4 py-3 font-mono tracking-widest text-slate-600">{r.join_code}</td>
-                  <td className="px-4 py-3">
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${statusColor[r.status]}`}>{statusLabel[r.status]}</span>
+                  <td className="px-3 py-2.5 font-mono tracking-widest text-slate-600">{r.join_code}</td>
+                  <td className="px-3 py-2.5">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusColor[r.status]}`}>{statusLabel[r.status]}</span>
                   </td>
                 </tr>
               ))}

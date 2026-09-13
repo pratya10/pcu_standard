@@ -166,7 +166,24 @@ export type Score = {
   updated_at: string
 }
 
-export type TeamItemNote = ItemNote & { checkedBy?: string | null }
+// A single evaluator's comment within the team's shared, editable comment
+// list — createdAt is set once at creation and never touched again, so an
+// edit doesn't reset "when this was first said."
+export type TeamComment = {
+  id: string
+  authorId: string | null
+  author: string
+  text: string
+  createdAt: string
+}
+
+export type TeamItemNote = {
+  checked: boolean
+  checkedBy?: string | null
+  comments?: TeamComment[]
+  /** @deprecated pre-migration free-text log; read-only, kept for old rows */
+  comment?: string
+}
 
 export type TeamScore = {
   id: string

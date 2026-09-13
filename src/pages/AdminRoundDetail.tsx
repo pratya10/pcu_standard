@@ -16,7 +16,6 @@ export default function AdminRoundDetail() {
   const [participants, setParticipants] = useState<Participant[]>([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
-  const [copied, setCopied] = useState(false)
   const [editingInfo, setEditingInfo] = useState(false)
   const [editName, setEditName] = useState('')
   const [editDate, setEditDate] = useState('')
@@ -275,18 +274,16 @@ export default function AdminRoundDetail() {
               </button>
             </div>
           )}
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(joinUrl)
-              setCopied(true)
-              setTimeout(() => setCopied(false), 1500)
-            }}
-            title="คลิกเพื่อคัดลอกลิงก์เข้าร่วม"
-            className="cursor-pointer rounded-lg p-1 transition hover:bg-slate-50 active:scale-95"
+          <a
+            href={joinUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="เปิดหน้าเข้าร่วมในแท็บใหม่"
+            className="inline-block cursor-pointer rounded-lg p-1 transition hover:bg-slate-50 active:scale-95"
           >
             <QRCodeSVG value={joinUrl} size={120} />
-          </button>
-          <p className="mt-2 text-xs text-slate-400">{copied ? 'คัดลอกลิงก์แล้ว ✓' : 'แตะที่ QR code เพื่อคัดลอกลิงก์เข้าร่วม'}</p>
+          </a>
+          <p className="mt-2 text-xs text-slate-400">แตะที่ QR code เพื่อเปิดหน้าเข้าร่วมในแท็บใหม่</p>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { ScoreValue, TeamScore, Topic, TopicEvidenceItem, TopicPhoto, TopicScoreItem } from '../types'
+import type { ScoreValue, TeamComment, TeamItemNote, TeamScore, Topic, TopicEvidenceItem, TopicPhoto, TopicScoreItem } from '../types'
 import {
   deleteTopicPhoto,
   getTopicPhotoUrl,
@@ -9,7 +9,7 @@ import {
   MAX_PHOTO_BYTES,
   uploadTopicPhoto,
 } from '../lib/topicPhotos'
-import { logTeamScoreOverwrite, upsertTeamScore, type TeamScoreDraft } from '../lib/teamScoresApi'
+import { logTeamScoreOverwrite, parseTeamComments, serializeTeamComments, upsertTeamScore, type TeamScoreDraft } from '../lib/teamScoresApi'
 import { useConfirm } from './ConfirmProvider'
 import Icon from './Icon'
 
@@ -22,14 +22,19 @@ const SCORE_COLOR: Record<ScoreValue, string> = {
   2: 'border-emerald-600 bg-emerald-500 text-white',
 }
 
-function nowLabel() {
-  const d = new Date()
+function formatEntryTime(iso: string) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-function appendComment(existing: string | null | undefined, authorName: string, text: string) {
-  const line = `[${authorName} · ${nowLabel()}] ${text.trim()}`
-  return existing ? `${existing}\n${line}` : line
+// A note's comments live in the new structured `comments` array going
+// forward; `comment` (plain string) only lingers on rows saved before this
+// feature existed, so it's read as a single legacy, non-editable entry.
+function getNoteComments(note: TeamItemNote | undefined): TeamComment[] {
+  if (!note) return []
+  return note.comments && note.comments.length > 0 ? note.comments : parseTeamComments(note.comment)
 }
 
 export default function TeamTopicScoreCard({
@@ -57,7 +62,9 @@ export default function TeamTopicScoreCard({
   const [open, setOpen] = useState(false)
   const [openComments, setOpenComments] = useState<Set<string>>(new Set())
   const [newComment, setNewComment] = useState<Record<string, string>>({})
+  const [editingItemCommentId, setEditingItemCommentId] = useState<Record<string, string | null>>({})
   const [newTopicComment, setNewTopicComment] = useState('')
+  const [editingTopicCommentId, setEditingTopicCommentId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   const [photos, setPhotos] = useState<TopicPhoto[]>([])
@@ -68,9 +75,10 @@ export default function TeamTopicScoreCard({
   const isNa = teamScore?.is_na ?? false
   const mustPass = teamScore?.must_pass ?? null
   const comment = teamScore?.comment ?? ''
+  const topicComments = parseTeamComments(comment)
   const itemNotes = teamScore?.item_notes ?? {}
   const answered = isNa || score !== null
-  const commentCount = Object.values(itemNotes).filter((n) => n.comment?.trim()).length
+  const commentCount = Object.values(itemNotes).filter((n) => getNoteComments(n).length > 0).length
   const photosByItem = groupPhotosByItem(photos)
   const photoCount = photos.length
 
@@ -170,24 +178,54 @@ export default function TeamTopicScoreCard({
         newValue: checked,
       })
     }
-    const next = { ...itemNotes, [itemId]: { checked, checkedBy: participantId, comment: current?.comment ?? '' } }
+    const next = { ...itemNotes, [itemId]: { checked, checkedBy: participantId, comments: getNoteComments(current) } }
     await persist({ itemNotes: next })
   }
 
   async function submitItemComment(itemId: string) {
     const text = (newComment[itemId] ?? '').trim()
     if (!text) return
-    const current = itemNotes[itemId] ?? { checked: false, comment: '' }
-    const next = { ...itemNotes, [itemId]: { ...current, comment: appendComment(current.comment, participantName, text) } }
+    const current = itemNotes[itemId]
+    const existingComments = getNoteComments(current)
+    const editingId = editingItemCommentId[itemId]
+    const nextComments = editingId
+      ? existingComments.map((c) => (c.id === editingId ? { ...c, text } : c))
+      : [...existingComments, { id: crypto.randomUUID(), authorId: participantId, author: participantName, text, createdAt: new Date().toISOString() }]
+    const next = { ...itemNotes, [itemId]: { checked: current?.checked ?? false, checkedBy: current?.checkedBy, comments: nextComments } }
     setNewComment((prev) => ({ ...prev, [itemId]: '' }))
+    setEditingItemCommentId((prev) => ({ ...prev, [itemId]: null }))
     await persist({ itemNotes: next })
+  }
+
+  function startEditItemComment(itemId: string, c: TeamComment) {
+    setNewComment((prev) => ({ ...prev, [itemId]: c.text }))
+    setEditingItemCommentId((prev) => ({ ...prev, [itemId]: c.id }))
+  }
+
+  function cancelEditItemComment(itemId: string) {
+    setNewComment((prev) => ({ ...prev, [itemId]: '' }))
+    setEditingItemCommentId((prev) => ({ ...prev, [itemId]: null }))
   }
 
   async function submitTopicComment() {
     const text = newTopicComment.trim()
     if (!text) return
+    const nextComments = editingTopicCommentId
+      ? topicComments.map((c) => (c.id === editingTopicCommentId ? { ...c, text } : c))
+      : [...topicComments, { id: crypto.randomUUID(), authorId: participantId, author: participantName, text, createdAt: new Date().toISOString() }]
     setNewTopicComment('')
-    await persist({ comment: appendComment(comment, participantName, text) })
+    setEditingTopicCommentId(null)
+    await persist({ comment: serializeTeamComments(nextComments) })
+  }
+
+  function startEditTopicComment(c: TeamComment) {
+    setNewTopicComment(c.text)
+    setEditingTopicCommentId(c.id)
+  }
+
+  function cancelEditTopicComment() {
+    setNewTopicComment('')
+    setEditingTopicCommentId(null)
   }
 
   async function handlePhotoChange(itemId: string, e: React.ChangeEvent<HTMLInputElement>) {
@@ -242,7 +280,9 @@ export default function TeamTopicScoreCard({
           const checked = note?.checked ?? false
           const commentOpen = openComments.has(item.id)
           const itemPhotos = photosByItem.get(item.id) ?? []
-          const hasNote = !!note?.comment || itemPhotos.length > 0
+          const noteComments = getNoteComments(note)
+          const hasNote = noteComments.length > 0 || itemPhotos.length > 0
+          const editingId = editingItemCommentId[item.id]
           return (
             <div key={item.id} className="rounded-md bg-slate-50 px-2 py-2">
               <div className="flex items-center gap-2">
@@ -257,7 +297,7 @@ export default function TeamTopicScoreCard({
                   }`}
                 >
                   <Icon name="add_comment" className="!text-sm" />
-                  {note?.comment ? note.comment.split('\n').length : ''}
+                  {noteComments.length > 0 ? noteComments.length : ''}
                   <Icon name="add_a_photo" className="!text-sm" />
                   {itemPhotos.length > 0 ? itemPhotos.length : ''}
                 </button>
@@ -265,11 +305,34 @@ export default function TeamTopicScoreCard({
               {note?.checkedBy && <p className="mt-0.5 pl-[52px] text-[10px] text-slate-400">แก้ล่าสุดโดย {editorName(note.checkedBy)}</p>}
               {commentOpen && (
                 <div className="mt-1.5 pl-9">
-                  {note?.comment && (
-                    <div className="mb-1.5 whitespace-pre-line rounded-md bg-white p-1.5 text-xs text-slate-600">{note.comment}</div>
+                  {noteComments.length > 0 && (
+                    <div className="mb-1.5 flex flex-col gap-1">
+                      {noteComments.map((c) => (
+                        <div key={c.id} className="rounded-md bg-white p-1.5 text-xs text-slate-600">
+                          <p className="whitespace-pre-line">{c.text}</p>
+                          {c.author && (
+                            <p className="mt-0.5 flex items-center justify-between gap-2 text-[10px] text-slate-400">
+                              <span>
+                                {c.author}
+                                {c.createdAt && ` · ${formatEntryTime(c.createdAt)}`}
+                              </span>
+                              {!readOnly && c.authorId === participantId && (
+                                <button
+                                  type="button"
+                                  onClick={() => startEditItemComment(item.id, c)}
+                                  className="font-medium text-emerald-600 hover:underline"
+                                >
+                                  แก้ไข
+                                </button>
+                              )}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   )}
                   {!readOnly && (
-                    <div className="flex items-end gap-1">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-end">
                       <textarea
                         value={newComment[item.id] ?? ''}
                         onChange={(e) => setNewComment((prev) => ({ ...prev, [item.id]: e.target.value }))}
@@ -283,13 +346,24 @@ export default function TeamTopicScoreCard({
                         placeholder="พิมพ์คอมเมนต์แล้วกด Enter (Shift+Enter ขึ้นบรรทัดใหม่)..."
                         className="w-full resize-y rounded-md border border-slate-300 p-1.5 text-xs"
                       />
-                      <button
-                        type="button"
-                        onClick={() => submitItemComment(item.id)}
-                        className="shrink-0 rounded-md bg-slate-700 px-2 py-1.5 text-xs font-medium text-white"
-                      >
-                        ส่ง
-                      </button>
+                      <div className="flex shrink-0 gap-1">
+                        {editingId && (
+                          <button
+                            type="button"
+                            onClick={() => cancelEditItemComment(item.id)}
+                            className="rounded-md border border-slate-300 px-2 py-1.5 text-xs font-medium text-slate-500"
+                          >
+                            ยกเลิก
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => submitItemComment(item.id)}
+                          className="flex-1 rounded-md bg-slate-700 px-2 py-1.5 text-xs font-medium text-white sm:flex-none"
+                        >
+                          {editingId ? 'บันทึก' : 'ส่ง'}
+                        </button>
+                      </div>
                     </div>
                   )}
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -408,66 +482,98 @@ export default function TeamTopicScoreCard({
             </div>
           )}
 
-          {topic.must_text && (
-            <div className="mb-4">
-              <p className="mb-1 text-base font-bold text-slate-800">ผลการประเมิน The Must</p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={readOnly}
-                  onClick={() => applyMustPass(false)}
-                  className={`flex-1 rounded-2xl border-2 py-3 text-base font-bold ${mustPass === false ? 'border-red-600 bg-red-500 text-white' : 'border-slate-300 text-slate-500'}`}
-                >
-                  ✗ ไม่ผ่าน
-                </button>
-                <button
-                  type="button"
-                  disabled={readOnly}
-                  onClick={() => applyMustPass(true)}
-                  className={`flex-1 rounded-2xl border-2 py-3 text-base font-bold ${mustPass === true ? 'border-emerald-600 bg-emerald-500 text-white' : 'border-slate-300 text-slate-500'}`}
-                >
-                  ✓ ผ่าน
-                </button>
+          {/* Sticky action bar: pinned to the bottom of the screen while
+              scrolling through this topic's own content above, then
+              releases back into normal flow once scroll reaches its real
+              position here — letting the next topic's bar take over. The
+              small code/name line exists because by the time it's pinned,
+              the topic header up top is usually long scrolled out of view. */}
+          <div className="sticky bottom-0 z-10 -mx-4 mt-2 border-t border-slate-200 bg-white/95 px-4 pt-2 pb-2.5 backdrop-blur">
+            <p className="mb-1 truncate text-[10px] font-medium text-slate-400">
+              {topic.code} · {topic.name_th}
+            </p>
+            {topic.must_text && (
+              <div className="mb-2">
+                <p className="mb-1 text-base font-bold text-slate-800">ผลการประเมิน The Must</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => applyMustPass(false)}
+                    className={`flex-1 rounded-2xl border-2 py-[0.675rem] text-base font-bold ${mustPass === false ? 'border-red-600 bg-red-500 text-white' : 'border-slate-300 text-slate-500'}`}
+                  >
+                    ✗ ไม่ผ่าน
+                  </button>
+                  <button
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => applyMustPass(true)}
+                    className={`flex-1 rounded-2xl border-2 py-[0.675rem] text-base font-bold ${mustPass === true ? 'border-emerald-600 bg-emerald-500 text-white' : 'border-slate-300 text-slate-500'}`}
+                  >
+                    ✓ ผ่าน
+                  </button>
+                </div>
+                {teamScore?.must_pass_updated_by && mustPass !== null && (
+                  <p className="mt-1 text-[11px] text-slate-400">แก้ล่าสุดโดย {editorName(teamScore.must_pass_updated_by)}</p>
+                )}
               </div>
-              {teamScore?.must_pass_updated_by && mustPass !== null && (
-                <p className="mt-1 text-[11px] text-slate-400">แก้ล่าสุดโดย {editorName(teamScore.must_pass_updated_by)}</p>
-              )}
-            </div>
-          )}
+            )}
 
-          <div className="mb-4">
-            <p className="mb-1 text-base font-bold text-slate-800">คะแนน Continuous Improvement</p>
-            <div className={`grid gap-2 ${topic.allow_na ? 'grid-cols-4' : 'grid-cols-3'}`}>
-              {([0, 1, 2] as ScoreValue[]).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  disabled={readOnly}
-                  onClick={() => applyScore(v)}
-                  className={`rounded-2xl border-2 py-3 text-lg font-bold ${!isNa && score === v ? SCORE_COLOR[v] : 'border-slate-300 text-slate-500'}`}
-                >
-                  {v}
-                </button>
-              ))}
-              {topic.allow_na && (
-                <button
-                  type="button"
-                  disabled={readOnly}
-                  onClick={applyNa}
-                  className={`rounded-2xl border-2 py-3 text-lg font-bold ${isNa ? 'border-sky-600 bg-sky-500 text-white' : 'border-slate-300 text-slate-500'}`}
-                >
-                  N/A
-                </button>
-              )}
+            <div>
+              <p className="mb-1 text-base font-bold text-slate-800">คะแนน Continuous Improvement</p>
+              <div className={`grid gap-2 ${topic.allow_na ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                {([0, 1, 2] as ScoreValue[]).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => applyScore(v)}
+                    className={`rounded-2xl border-2 py-[0.675rem] text-lg font-bold ${!isNa && score === v ? SCORE_COLOR[v] : 'border-slate-300 text-slate-500'}`}
+                  >
+                    {v}
+                  </button>
+                ))}
+                {topic.allow_na && (
+                  <button
+                    type="button"
+                    disabled={readOnly}
+                    onClick={applyNa}
+                    className={`rounded-2xl border-2 py-[0.675rem] text-lg font-bold ${isNa ? 'border-sky-600 bg-sky-500 text-white' : 'border-slate-300 text-slate-500'}`}
+                  >
+                    N/A
+                  </button>
+                )}
+              </div>
+              {teamScore?.updated_by && answered && <p className="mt-1 text-[11px] text-slate-400">แก้ล่าสุดโดย {editorName(teamScore.updated_by)}</p>}
             </div>
-            {teamScore?.updated_by && answered && <p className="mt-1 text-[11px] text-slate-400">แก้ล่าสุดโดย {editorName(teamScore.updated_by)}</p>}
           </div>
 
-          <div>
+          <div className="mt-4">
             <p className="mb-1 text-sm font-semibold text-slate-600">เหตุผล / บันทึกเพิ่มเติม (ช่วยกันคอมเมนต์ได้)</p>
-            {comment && <div className="mb-1.5 whitespace-pre-line rounded-lg bg-slate-50 p-2 text-sm text-slate-600">{comment}</div>}
+            {topicComments.length > 0 && (
+              <div className="mb-1.5 flex flex-col gap-1">
+                {topicComments.map((c) => (
+                  <div key={c.id} className="rounded-lg bg-slate-50 p-2 text-sm text-slate-600">
+                    <p className="whitespace-pre-line">{c.text}</p>
+                    {c.author && (
+                      <p className="mt-0.5 flex items-center justify-between gap-2 text-xs text-slate-400">
+                        <span>
+                          {c.author}
+                          {c.createdAt && ` · ${formatEntryTime(c.createdAt)}`}
+                        </span>
+                        {!readOnly && c.authorId === participantId && (
+                          <button type="button" onClick={() => startEditTopicComment(c)} className="font-medium text-emerald-600 hover:underline">
+                            แก้ไข
+                          </button>
+                        )}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
             {!readOnly && (
-              <div className="flex items-end gap-1.5">
+              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-end">
                 <textarea
                   value={newTopicComment}
                   onChange={(e) => setNewTopicComment(e.target.value)}
@@ -481,13 +587,24 @@ export default function TeamTopicScoreCard({
                   placeholder="พิมพ์แล้วกด Enter เพื่อเพิ่มความเห็น (Shift+Enter ขึ้นบรรทัดใหม่)..."
                   className="w-full resize-y rounded-lg border border-slate-300 p-2 text-sm"
                 />
-                <button
-                  type="button"
-                  onClick={submitTopicComment}
-                  className="shrink-0 rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white"
-                >
-                  ส่ง
-                </button>
+                <div className="flex shrink-0 gap-1.5">
+                  {editingTopicCommentId && (
+                    <button
+                      type="button"
+                      onClick={cancelEditTopicComment}
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-500"
+                    >
+                      ยกเลิก
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={submitTopicComment}
+                    className="flex-1 rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white sm:flex-none"
+                  >
+                    {editingTopicCommentId ? 'บันทึก' : 'ส่ง'}
+                  </button>
+                </div>
               </div>
             )}
           </div>

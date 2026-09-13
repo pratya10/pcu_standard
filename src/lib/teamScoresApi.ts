@@ -1,11 +1,49 @@
 import { supabase } from './supabaseClient'
-import type { Score, ScoreValue, TeamItemNote, TeamScore, TeamScoreAudit, TeamScoreAuditField } from '../types'
+import type { ItemNote, Score, ScoreValue, TeamComment, TeamItemNote, TeamScore, TeamScoreAudit, TeamScoreAuditField } from '../types'
+
+// Team comments are stored as JSON.stringify(TeamComment[]) in what's
+// otherwise a plain text column, so old (pre-edit-feature) rounds whose
+// comment is still a plain free-text log fail to parse as JSON — that
+// fallback surfaces the whole old blob as a single read-only legacy entry
+// instead of losing it.
+export function parseTeamComments(raw: string | null | undefined): TeamComment[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) return parsed as TeamComment[]
+  } catch {
+    // not JSON — legacy plain-text append-log, fall through
+  }
+  return [{ id: 'legacy', authorId: null, author: '', text: raw, createdAt: '' }]
+}
+
+export function serializeTeamComments(comments: TeamComment[]): string {
+  return JSON.stringify(comments)
+}
+
+function formatEntryTime(iso: string) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function commentsToText(comments: TeamComment[]): string {
+  return comments.map((c) => (c.author ? `[${c.author}${c.createdAt ? ' · ' + formatEntryTime(c.createdAt) : ''}] ${c.text}` : c.text)).join('\n')
+}
 
 // Lets a collaborative round's single shared team_scores row flow through
 // the exact same aggregate/report/docx code that 'average' mode already
 // uses for its per-participant `scores` rows — aggregating an array with
 // just this one synthetic entry naturally reduces to "use this value as-is".
+// The structured, editable comment lists are flattened back into the same
+// "[name · time] text" lines the reports already know how to render.
 export function teamScoreToScore(ts: TeamScore): Score {
+  const itemNotes: Record<string, ItemNote> = {}
+  for (const [itemId, note] of Object.entries(ts.item_notes)) {
+    const comments = note.comments && note.comments.length > 0 ? note.comments : parseTeamComments(note.comment)
+    itemNotes[itemId] = { checked: note.checked, comment: commentsToText(comments) }
+  }
   return {
     id: ts.id,
     round_id: ts.round_id,
@@ -14,9 +52,9 @@ export function teamScoreToScore(ts: TeamScore): Score {
     score: ts.score,
     is_na: ts.is_na,
     must_pass: ts.must_pass,
-    comment: ts.comment,
+    comment: commentsToText(parseTeamComments(ts.comment)),
     evidence_checked: [],
-    item_notes: ts.item_notes,
+    item_notes: itemNotes,
     updated_at: ts.updated_at,
   }
 }
