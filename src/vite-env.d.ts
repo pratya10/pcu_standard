@@ -19,7 +19,7 @@ interface Window {
         }): void
         renderButton(
           parent: HTMLElement,
-          options: { theme?: string; size?: string; text?: string; shape?: string; width?: number },
+          options: { type?: string; theme?: string; size?: string; text?: string; shape?: string; width?: number },
         ): void
         prompt(): void
       }
