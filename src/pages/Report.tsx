@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { loadStandardByVersionId, allTopicsFlat } from '../lib/loadStandard'
@@ -25,6 +25,7 @@ export default function Report() {
   const [loading, setLoading] = useState(true)
   const [printMode, setPrintMode] = useState<'summary' | 'detailed'>('summary')
   const [showAuditLog, setShowAuditLog] = useState(false)
+  const printAreaRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!roundId) return
@@ -81,14 +82,40 @@ export default function Report() {
     return () => window.removeEventListener('afterprint', resetAfterPrint)
   }, [])
 
+  // The logo (and any evidence photos in the detailed report) are fetched
+  // over the network, so without this the print dialog/PDF can capture the
+  // page before those images have actually finished loading and render
+  // them blank.
+  function waitForImages(root: HTMLElement, timeoutMs = 8000): Promise<void> {
+    const pending = Array.from(root.querySelectorAll('img')).filter((img) => !img.complete)
+    if (pending.length === 0) return Promise.resolve()
+    return new Promise((resolve) => {
+      let remaining = pending.length
+      const done = () => {
+        remaining -= 1
+        if (remaining <= 0) resolve()
+      }
+      pending.forEach((img) => {
+        img.addEventListener('load', done, { once: true })
+        img.addEventListener('error', done, { once: true })
+      })
+      setTimeout(resolve, timeoutMs)
+    })
+  }
+
+  async function triggerPrint(mode: 'summary' | 'detailed') {
+    setPrintMode(mode)
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    if (printAreaRef.current) await waitForImages(printAreaRef.current)
+    window.print()
+  }
+
   function printDetailed() {
-    setPrintMode('detailed')
-    requestAnimationFrame(() => requestAnimationFrame(() => window.print()))
+    triggerPrint('detailed')
   }
 
   function printSummary() {
-    setPrintMode('summary')
-    requestAnimationFrame(() => requestAnimationFrame(() => window.print()))
+    triggerPrint('summary')
   }
 
   useEffect(() => {
@@ -183,6 +210,7 @@ export default function Report() {
 
   return (
     <div
+      ref={printAreaRef}
       className={`mx-auto max-w-3xl px-6 py-8 print:px-0 print:py-0 ${
         printMode === 'summary' ? 'print:rounded-lg print:border-[3px] print:border-double print:border-amber-800 print:p-6' : ''
       }`}
@@ -253,7 +281,7 @@ export default function Report() {
         <p className="text-sm text-slate-500 print:text-[11px]">{standard.standardVersion.name}</p>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-x-6 gap-y-1 rounded-xl border border-slate-200 p-4 text-sm print:mb-2 print:gap-y-0 print:p-2 print:text-[11px]">
+      <div className="mb-6 grid grid-cols-2 gap-x-6 gap-y-1 rounded-xl border border-slate-200 p-4 text-sm print:mb-1.5 print:gap-y-0 print:p-1.5 print:text-[9px]">
         <p>
           <span className="text-slate-500">หน่วยบริการ: </span>
           {facility?.name}
@@ -282,16 +310,16 @@ export default function Report() {
           const catTotal = catTopics.reduce((sum, t) => sum + (aggregates.get(t.id)?.avgScore ?? 0), 0)
           const catPass = catTopics.every((t) => aggregates.get(t.id)?.mustPassFinal !== false)
           return (
-            <div key={cat.id} className="mb-6 break-inside-avoid print:mb-1.5">
-              <h2 className="mb-2 text-sm font-bold text-slate-800 print:mb-0.5 print:text-[11px]">
+            <div key={cat.id} className="mb-6 break-inside-avoid print:mb-1">
+              <h2 className="mb-2 text-sm font-bold text-slate-800 print:mb-0.5 print:text-[9px]">
                 หมวดที่ {cat.code} · {cat.name_th}
               </h2>
-              <table className="w-full border-collapse text-sm print:text-[10px]">
+              <table className="w-full border-collapse text-sm print:text-[7px] print:leading-tight">
                 <thead>
-                  <tr className="border-b border-slate-300 text-left text-xs text-slate-500 print:text-[9px]">
-                    <th className="py-1 pr-2 print:py-0.5">หัวข้อ</th>
-                    <th className="py-1 pr-2 text-center print:py-0.5">The Must</th>
-                    <th className="py-1 pr-2 text-center print:py-0.5">คะแนน (0-2)</th>
+                  <tr className="border-b border-slate-300 text-left text-xs text-slate-500 print:text-[7px]">
+                    <th className="py-1 pr-2 print:py-0">หัวข้อ</th>
+                    <th className="py-1 pr-2 text-center print:py-0">The Must</th>
+                    <th className="py-1 pr-2 text-center print:py-0">คะแนน (0-2)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -299,20 +327,20 @@ export default function Report() {
                     const agg = aggregates.get(t.id)
                     return (
                       <tr key={t.id} className="border-b border-slate-100">
-                        <td className="py-1 pr-2 print:py-0.5">
-                          <span className="font-mono text-xs text-slate-400 print:text-[9px]">{t.code}</span> {t.name_th}
+                        <td className="py-1 pr-2 print:py-0">
+                          <span className="font-mono text-xs text-slate-400 print:text-[7px]">{t.code}</span> {t.name_th}
                         </td>
-                        <td className="py-1 pr-2 text-center print:py-0.5">
+                        <td className="py-1 pr-2 text-center print:py-0">
                           {agg?.mustPassFinal === null || agg?.mustPassFinal === undefined ? '-' : agg.mustPassFinal ? 'ผ่าน' : 'ไม่ผ่าน'}
                         </td>
-                        <td className="py-1 pr-2 text-center font-semibold print:py-0.5">{formatAvg(agg?.avgScore ?? null)}</td>
+                        <td className="py-1 pr-2 text-center font-semibold print:py-0">{formatAvg(agg?.avgScore ?? null)}</td>
                       </tr>
                     )
                   })}
                   <tr className="font-semibold text-slate-800">
-                    <td className="py-1 pr-2 print:py-0.5">รวม</td>
-                    <td className="py-1 pr-2 text-center print:py-0.5">{catPass ? 'ผ่าน' : 'ไม่ผ่าน'}</td>
-                    <td className="py-1 pr-2 text-center print:py-0.5">{catTotal.toFixed(1)}</td>
+                    <td className="py-1 pr-2 print:py-0">รวม</td>
+                    <td className="py-1 pr-2 text-center print:py-0">{catPass ? 'ผ่าน' : 'ไม่ผ่าน'}</td>
+                    <td className="py-1 pr-2 text-center print:py-0">{catTotal.toFixed(1)}</td>
                   </tr>
                 </tbody>
               </table>
