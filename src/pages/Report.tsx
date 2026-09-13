@@ -212,7 +212,7 @@ export default function Report() {
     <div
       ref={printAreaRef}
       className={`mx-auto max-w-3xl px-6 py-8 print:px-0 print:py-0 ${
-        printMode === 'summary' ? 'print:flex print:min-h-[273mm] print:flex-col print:justify-between' : ''
+        printMode === 'summary' ? 'print:flex print:min-h-[250mm] print:flex-col print:justify-between' : ''
       }`}
     >
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -425,22 +425,24 @@ export default function Report() {
         </div>
       )}
 
-      <div className="mb-8 rounded-xl border-2 border-slate-800 p-4 text-center print:mb-0 print:border print:border-slate-800 print:p-2">
-        <p className="text-sm text-slate-500 print:text-[10px]">สรุปผลการประเมินภาพรวม</p>
-        <p className="text-3xl font-bold text-slate-800 print:text-base">{grandTotal.toFixed(1)} คะแนน</p>
-        <p className={`text-sm font-semibold print:text-[10px] ${overallPass ? 'text-emerald-600' : 'text-red-600'}`}>
-          {overallPass ? 'ผ่านเกณฑ์ The Must ครบทุกหัวข้อ' : `ไม่ผ่านเกณฑ์ The Must จำนวน ${mustFailTopics.length} หัวข้อ`}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-8 pt-8 text-center text-sm print:gap-6 print:pt-0 print:text-[10px]">
-        <div>
-          <p className="mb-8 print:mb-4">ลงชื่อ .............................................</p>
-          <p>ประธานคณะกรรมการประเมิน</p>
+      <div className="break-inside-avoid">
+        <div className="mb-8 rounded-xl border-2 border-slate-800 p-4 text-center print:mb-4 print:border print:border-slate-800 print:p-2">
+          <p className="text-sm text-slate-500 print:text-[10px]">สรุปผลการประเมินภาพรวม</p>
+          <p className="text-3xl font-bold text-slate-800 print:text-base">{grandTotal.toFixed(1)} คะแนน</p>
+          <p className={`text-sm font-semibold print:text-[10px] ${overallPass ? 'text-emerald-600' : 'text-red-600'}`}>
+            {overallPass ? 'ผ่านเกณฑ์ The Must ครบทุกหัวข้อ' : `ไม่ผ่านเกณฑ์ The Must จำนวน ${mustFailTopics.length} หัวข้อ`}
+          </p>
         </div>
-        <div>
-          <p className="mb-8 print:mb-4">ลงชื่อ .............................................</p>
-          <p>ผู้อำนวยการหน่วยบริการ</p>
+
+        <div className="grid grid-cols-2 gap-8 pt-8 text-center text-sm print:gap-6 print:pt-0 print:text-[10px]">
+          <div>
+            <p className="mb-8 print:mb-4">ลงชื่อ .............................................</p>
+            <p>ประธานคณะกรรมการประเมิน</p>
+          </div>
+          <div>
+            <p className="mb-8 print:mb-4">ลงชื่อ .............................................</p>
+            <p>ผู้อำนวยการหน่วยบริการ</p>
+          </div>
         </div>
       </div>
     </div>
