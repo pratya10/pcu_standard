@@ -87,7 +87,6 @@ export default function ScoreForm() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 pb-20">
       <div className="sticky top-0 z-10 mb-4 -mx-4 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
-        <p className="text-xs text-slate-400">{standard.standardVersion.name}</p>
         <h1 className="text-lg font-bold text-slate-800">{round.name}</h1>
         <div className="mt-2 flex items-center justify-between text-sm">
           <span className="text-slate-500">
