@@ -391,8 +391,7 @@ export default function ScoreForm() {
 
   function TopicNavRow({ topic, parentBlockId }: { topic: SectionTopic; parentBlockId: string }) {
     const r = resultFor(topic.id)
-    const hasMust = !!topic.must_text
-    const mustLabel = !hasMust ? null : r?.mustPass === true ? 'ผ่าน' : r?.mustPass === false ? 'ไม่ผ่าน' : '-'
+    const mustLabel = r?.mustPass === true ? 'ผ่าน' : r?.mustPass === false ? 'ไม่ผ่าน' : '-'
     const ciLabel = r?.isNa ? 'NA' : (r?.score ?? '-')
     const mustClass = mustLabel === 'ผ่าน' ? 'text-emerald-600' : mustLabel === 'ไม่ผ่าน' ? 'text-red-600' : 'text-slate-400'
     // Matches the CI score buttons' own colors (SCORE_COLOR in TopicScoreCard): 0=amber, 1=orange, 2=emerald, NA=sky.
@@ -417,7 +416,7 @@ export default function ScoreForm() {
           {topic.short_name && <span className="text-slate-600"> {topic.short_name}</span>}
         </span>
         <span className="flex shrink-0 items-center gap-1">
-          {mustLabel !== null && <span className={mustClass}>{mustLabel}</span>}
+          <span className={mustClass}>{mustLabel}</span>
           <span className={ciClass}>| {ciLabel}</span>
         </span>
       </button>
@@ -610,14 +609,14 @@ export default function ScoreForm() {
           <div key={s.id} className="mb-6">
             <h2
               id={s.id}
-              className="sticky z-[5] -mx-4 mb-2 scroll-mt-40 border-b border-slate-200 bg-slate-50/95 px-4 py-2 text-sm font-bold text-slate-700 backdrop-blur md:mx-0 md:rounded-t-lg"
-              style={{ top: headerHeight }}
+              className="sticky z-[5] -mx-4 mb-2 border-b border-slate-200 bg-slate-50/95 px-4 py-2 text-sm font-bold text-slate-700 backdrop-blur md:mx-0 md:rounded-t-lg"
+              style={{ top: headerHeight, scrollMarginTop: headerHeight }}
             >
               {s.headerLabel}
             </h2>
             <div className="mb-3 flex flex-col gap-2">
               {s.topics.map((t) => (
-                <div key={t.id} id={`topic-${t.id}`} className="scroll-mt-40">
+                <div key={t.id} id={`topic-${t.id}`} style={{ scrollMarginTop: headerHeight + GROUP_HEADER_HEIGHT }}>
                   {collaborative ? (
                     <TeamTopicScoreCard
                       topic={t}
