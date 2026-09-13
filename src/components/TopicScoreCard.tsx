@@ -344,23 +344,23 @@ export default function TopicScoreCard({
                   type="button"
                   disabled={readOnly}
                   onClick={() => {
-                    setMustPass(true)
-                    save({ mustPass: true })
-                  }}
-                  className={`flex-1 rounded-2xl border-2 py-3 text-base font-bold ${mustPass === true ? 'border-emerald-600 bg-emerald-500 text-white' : 'border-slate-300 text-slate-500'}`}
-                >
-                  ✓ ผ่าน
-                </button>
-                <button
-                  type="button"
-                  disabled={readOnly}
-                  onClick={() => {
                     setMustPass(false)
                     save({ mustPass: false })
                   }}
                   className={`flex-1 rounded-2xl border-2 py-3 text-base font-bold ${mustPass === false ? 'border-red-600 bg-red-500 text-white' : 'border-slate-300 text-slate-500'}`}
                 >
                   ✗ ไม่ผ่าน
+                </button>
+                <button
+                  type="button"
+                  disabled={readOnly}
+                  onClick={() => {
+                    setMustPass(true)
+                    save({ mustPass: true })
+                  }}
+                  className={`flex-1 rounded-2xl border-2 py-3 text-base font-bold ${mustPass === true ? 'border-emerald-600 bg-emerald-500 text-white' : 'border-slate-300 text-slate-500'}`}
+                >
+                  ✓ ผ่าน
                 </button>
               </div>
             </div>

@@ -99,20 +99,24 @@ export default function ScoreForm() {
   function sectionSummary(section: Section) {
     let ciAchieved = 0
     let ciMax = 0
+    let ciAnswered = 0
     let mustPass = 0
     let mustTotal = 0
+    let mustAnswered = 0
     for (const t of section.topics) {
       const s = scoreByTopic.get(t.id)
       if (!s?.is_na) {
         ciAchieved += s?.score ?? 0
         ciMax += 2
       }
+      if (s && (s.is_na || s.score !== null)) ciAnswered++
       if (t.must_text) {
         mustTotal++
         if (s?.must_pass === true) mustPass++
+        if (s?.must_pass !== null && s?.must_pass !== undefined) mustAnswered++
       }
     }
-    return { ciAchieved, ciMax, mustPass, mustTotal }
+    return { ciAchieved, ciMax, ciAnswered, mustPass, mustTotal, mustAnswered }
   }
 
   if (loading) return <div className="flex min-h-screen items-center justify-center text-slate-400">กำลังโหลด...</div>
@@ -165,8 +169,20 @@ export default function ScoreForm() {
         )}
       </div>
       {sections.map((s) => {
-        const { ciAchieved, ciMax, mustPass, mustTotal } = sectionSummary(s)
+        const { ciAchieved, ciMax, ciAnswered, mustPass, mustTotal, mustAnswered } = sectionSummary(s)
         const active = activeSectionId === s.id
+        const mustClass =
+          mustAnswered === 0
+            ? 'text-slate-400'
+            : mustPass === mustTotal
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-slate-200 text-slate-600'
+        const ciClass =
+          ciAnswered === 0
+            ? 'text-slate-400'
+            : ciMax > 0 && ciAchieved === ciMax
+              ? 'bg-emerald-100 text-emerald-700'
+              : 'bg-slate-200 text-slate-600'
         return (
           <button
             key={s.id}
@@ -180,21 +196,11 @@ export default function ScoreForm() {
             </span>
             <span className="flex gap-1 pl-[18px]">
               {mustTotal > 0 && (
-                <span
-                  title="The Must"
-                  className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${
-                    mustPass === mustTotal ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                  }`}
-                >
+                <span title="The Must" className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${mustClass}`}>
                   {mustPass} | {mustTotal}
                 </span>
               )}
-              <span
-                title="Continuous Improvement"
-                className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${
-                  ciMax > 0 && ciAchieved === ciMax ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
-                }`}
-              >
+              <span title="Continuous Improvement" className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${ciClass}`}>
                 {ciAchieved} | {ciMax}
               </span>
             </span>
