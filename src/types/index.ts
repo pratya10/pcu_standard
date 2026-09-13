@@ -68,6 +68,30 @@ export type TopicEvidenceItem = {
   sort_order: number
 }
 
+export type TopicScoreItem = {
+  id: string
+  topic_id: string
+  score_level: 0 | 1 | 2
+  item_text: string
+  sort_order: number
+}
+
+export type TopicPhoto = {
+  id: string
+  round_id: string
+  topic_id: string
+  uploaded_by: string | null
+  file_path: string
+  file_name: string | null
+  size_bytes: number | null
+  created_at: string
+}
+
+export type ItemNote = {
+  checked: boolean
+  comment: string
+}
+
 export type AssessmentRound = {
   id: string
   facility_id: string
@@ -134,13 +158,14 @@ export type Score = {
   must_pass: boolean | null
   comment: string | null
   evidence_checked: string[]
+  item_notes: Record<string, ItemNote>
   updated_at: string
 }
 
 export type FullStandard = {
   standardVersion: StandardVersion
   categories: (Category & {
-    groups: (TopicGroup & { topics: (Topic & { evidence: TopicEvidenceItem[] })[] })[]
-    topics: (Topic & { evidence: TopicEvidenceItem[] })[]
+    groups: (TopicGroup & { topics: (Topic & { evidence: TopicEvidenceItem[]; scoreItems: TopicScoreItem[] })[] })[]
+    topics: (Topic & { evidence: TopicEvidenceItem[]; scoreItems: TopicScoreItem[] })[]
   })[]
 }

@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "seed": "node scripts/seed-standard.mjs",
+    "seed:items": "node scripts/seed-topic-score-items.mjs",
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {

@@ -14,9 +14,9 @@ import {
 import { getLogoUrl } from './branding'
 import { formatAvg, type TopicAggregate } from './aggregate'
 import { formatThaiDate } from './thaiDate'
-import type { AssessmentRound, Facility, FullStandard, Participant, Topic, TopicEvidenceItem } from '../types'
+import type { AssessmentRound, Facility, FullStandard, Participant, Topic, TopicEvidenceItem, TopicScoreItem } from '../types'
 
-type TopicWithEvidence = Topic & { evidence: TopicEvidenceItem[] }
+type TopicWithEvidence = Topic & { evidence: TopicEvidenceItem[]; scoreItems: TopicScoreItem[] }
 
 export type ReportDocxInput = {
   round: AssessmentRound
@@ -26,6 +26,7 @@ export type ReportDocxInput = {
   evaluators: Participant[]
   grandTotal: number
   mustFailCount: number
+  includeComments?: boolean
 }
 
 type LogoAsset = {
@@ -102,8 +103,39 @@ function categoryTopics(cat: FullStandard['categories'][number]): TopicWithEvide
   return [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
 }
 
+function commentCell(lines: string[]) {
+  return new TableCell({
+    columnSpan: 3,
+    shading: { fill: 'F8FAFC' },
+    children: lines.map(
+      (line) =>
+        new Paragraph({
+          children: [new TextRun({ text: line, italics: true, size: 20, color: '475569' })],
+        }),
+    ),
+  })
+}
+
+function buildCommentLines(agg: TopicAggregate | undefined, topic: TopicWithEvidence, evaluatorNameById: Map<string, string>): string[] {
+  if (!agg) return []
+  const itemTextById = new Map(topic.scoreItems.map((it) => [it.id, it.item_text]))
+  const lines: string[] = []
+  for (const s of agg.scores) {
+    const name = evaluatorNameById.get(s.participant_id) ?? 'กรรมการ'
+    if (s.comment) lines.push(`${name}: ${s.comment}`)
+    for (const [itemId, note] of Object.entries(s.item_notes ?? {})) {
+      if (note.comment) {
+        const itemText = itemTextById.get(itemId) ?? itemId
+        lines.push(`${name} (${itemText}): ${note.comment}`)
+      }
+    }
+  }
+  return lines
+}
+
 export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> {
-  const { round, facility, standard, aggregates, evaluators, grandTotal, mustFailCount } = input
+  const { round, facility, standard, aggregates, evaluators, grandTotal, mustFailCount, includeComments } = input
+  const evaluatorNameById = new Map(evaluators.map((e) => [e.id, e.name]))
   const logo = await tryFetchLogo()
 
   const children: (Paragraph | Table)[] = []
@@ -180,6 +212,12 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
           ],
         }),
       )
+      if (includeComments) {
+        const commentLines = buildCommentLines(agg, t, evaluatorNameById)
+        if (commentLines.length) {
+          rows.push(new TableRow({ children: [commentCell(commentLines)] }))
+        }
+      }
     }
     rows.push(
       new TableRow({

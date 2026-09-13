@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient'
-import type { Score, ScoreValue } from '../types'
+import type { ItemNote, Score, ScoreValue } from '../types'
 
 export type ScoreDraft = {
   roundId: string
@@ -10,6 +10,7 @@ export type ScoreDraft = {
   mustPass: boolean | null
   comment: string
   evidenceChecked: string[]
+  itemNotes: Record<string, ItemNote>
 }
 
 export async function upsertScore(draft: ScoreDraft): Promise<Score> {
@@ -25,6 +26,7 @@ export async function upsertScore(draft: ScoreDraft): Promise<Score> {
         must_pass: draft.mustPass,
         comment: draft.comment || null,
         evidence_checked: draft.evidenceChecked,
+        item_notes: draft.itemNotes,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'round_id,topic_id,participant_id' },

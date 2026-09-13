@@ -1,38 +1,73 @@
-import { useState } from 'react'
-import type { Score, ScoreValue, Topic, TopicEvidenceItem } from '../types'
+import { useEffect, useState } from 'react'
+import type { ItemNote, Score, ScoreValue, Topic, TopicEvidenceItem, TopicPhoto, TopicScoreItem } from '../types'
+import { deleteTopicPhoto, getTopicPhotoUrl, listTopicPhotos, MAX_PHOTOS_PER_TOPIC, MAX_PHOTO_BYTES, uploadTopicPhoto } from '../lib/topicPhotos'
+import { useConfirm } from './ConfirmProvider'
 
-type TopicWithEvidence = Topic & { evidence: TopicEvidenceItem[] }
+type TopicWithEvidence = Topic & { evidence: TopicEvidenceItem[]; scoreItems: TopicScoreItem[] }
 
 export default function TopicScoreCard({
   topic,
   index,
   existing,
   readOnly,
+  roundId,
+  participantId,
+  accentColor,
   onSave,
 }: {
   topic: TopicWithEvidence
   index: number
   existing?: Score
   readOnly: boolean
+  roundId: string
+  participantId: string | null
+  accentColor?: string
   onSave: (draft: {
     score: ScoreValue | null
     isNa: boolean
     mustPass: boolean | null
     comment: string
     evidenceChecked: string[]
+    itemNotes: Record<string, ItemNote>
   }) => Promise<void>
 }) {
+  const confirm = useConfirm()
   const [open, setOpen] = useState(false)
   const [score, setScore] = useState<ScoreValue | null>(existing?.score ?? null)
   const [isNa, setIsNa] = useState(existing?.is_na ?? false)
   const [mustPass, setMustPass] = useState<boolean | null>(existing?.must_pass ?? null)
   const [comment, setComment] = useState(existing?.comment ?? '')
   const [evidenceChecked, setEvidenceChecked] = useState<string[]>(existing?.evidence_checked ?? [])
+  const [itemNotes, setItemNotes] = useState<Record<string, ItemNote>>(existing?.item_notes ?? {})
+  const [openComments, setOpenComments] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
+
+  const [photos, setPhotos] = useState<TopicPhoto[]>([])
+  const [photosLoaded, setPhotosLoaded] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
 
   const answered = isNa || score !== null
 
-  async function save(next: Partial<{ score: ScoreValue | null; isNa: boolean; mustPass: boolean | null; comment: string; evidenceChecked: string[] }>) {
+  useEffect(() => {
+    if (!open || photosLoaded) return
+    listTopicPhotos(roundId, topic.id)
+      .then(setPhotos)
+      .catch(() => {})
+      .finally(() => setPhotosLoaded(true))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  async function save(
+    next: Partial<{
+      score: ScoreValue | null
+      isNa: boolean
+      mustPass: boolean | null
+      comment: string
+      evidenceChecked: string[]
+      itemNotes: Record<string, ItemNote>
+    }>,
+  ) {
     if (readOnly) return
     const merged = {
       score: next.score !== undefined ? next.score : score,
@@ -40,6 +75,7 @@ export default function TopicScoreCard({
       mustPass: next.mustPass !== undefined ? next.mustPass : mustPass,
       comment: next.comment !== undefined ? next.comment : comment,
       evidenceChecked: next.evidenceChecked !== undefined ? next.evidenceChecked : evidenceChecked,
+      itemNotes: next.itemNotes !== undefined ? next.itemNotes : itemNotes,
     }
     setSaving(true)
     try {
@@ -55,10 +91,71 @@ export default function TopicScoreCard({
     save({ evidenceChecked: next })
   }
 
+  function toggleItemChecked(itemId: string) {
+    const current = itemNotes[itemId] ?? { checked: false, comment: '' }
+    const next = { ...itemNotes, [itemId]: { ...current, checked: !current.checked } }
+    setItemNotes(next)
+    save({ itemNotes: next })
+  }
+
+  function updateItemComment(itemId: string, text: string) {
+    const current = itemNotes[itemId] ?? { checked: false, comment: '' }
+    const next = { ...itemNotes, [itemId]: { ...current, comment: text } }
+    setItemNotes(next)
+  }
+
+  function commitItemComment() {
+    save({ itemNotes })
+  }
+
+  function toggleCommentBox(itemId: string) {
+    setOpenComments((prev) => {
+      const next = new Set(prev)
+      if (next.has(itemId)) next.delete(itemId)
+      else next.add(itemId)
+      return next
+    })
+  }
+
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setPhotoError(null)
+    if (photos.length >= MAX_PHOTOS_PER_TOPIC) {
+      setPhotoError(`แนบได้สูงสุด ${MAX_PHOTOS_PER_TOPIC} รูปต่อหัวข้อ`)
+      return
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      setPhotoError('ไฟล์รูปภาพต้องมีขนาดไม่เกิน 30 MB')
+      return
+    }
+    setUploadingPhoto(true)
+    try {
+      const photo = await uploadTopicPhoto({ roundId, topicId: topic.id, participantId, file })
+      setPhotos((prev) => [...prev, photo])
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'อัปโหลดไม่สำเร็จ')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  async function handleDeletePhoto(photo: TopicPhoto) {
+    const ok = await confirm({ title: 'ลบรูปภาพ', message: 'ลบรูปภาพนี้ออกจากหลักฐานการประเมิน?', confirmLabel: 'ลบ' })
+    if (!ok) return
+    await deleteTopicPhoto(photo)
+    setPhotos((prev) => prev.filter((p) => p.id !== photo.id))
+  }
+
   const scoreDescriptions = getScoreDescriptions(topic)
+  const itemsByLevel = groupItemsByLevel(topic.scoreItems)
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div
+      className="rounded-xl border border-slate-200 bg-white shadow-sm"
+      style={accentColor ? { borderLeftWidth: 4, borderLeftColor: accentColor } : undefined}
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -92,13 +189,95 @@ export default function TopicScoreCard({
           )}
           {topic.content_text && <p className="mb-3 text-sm text-slate-500">{topic.content_text}</p>}
 
-          <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {(['0', '1', '2'] as const).map((lvl) => (
-              <div key={lvl} className="rounded-lg border border-slate-200 p-2 text-xs">
-                <p className="mb-1 font-semibold text-slate-500">{lvl} คะแนน</p>
-                <p className="whitespace-pre-line text-slate-600">{scoreDescriptions[lvl] || '—'}</p>
+          <div className="mb-4 flex flex-col gap-3">
+            {(['0', '1', '2'] as const).map((lvl) => {
+              const items = itemsByLevel[lvl]
+              return (
+                <div key={lvl} className="rounded-lg border border-slate-200 p-3 text-sm">
+                  <p className="mb-2 font-semibold text-slate-600">{lvl} คะแนน</p>
+                  {items && items.length > 0 ? (
+                    <div className="flex flex-col gap-2">
+                      {items.map((item) => {
+                        const note = itemNotes[item.id]
+                        const checked = note?.checked ?? false
+                        const commentOpen = openComments.has(item.id)
+                        return (
+                          <div key={item.id} className="rounded-md bg-slate-50 px-2 py-1.5">
+                            <div className="flex items-start gap-2">
+                              <input
+                                type="checkbox"
+                                className="mt-0.5"
+                                disabled={readOnly}
+                                checked={checked}
+                                onChange={() => toggleItemChecked(item.id)}
+                              />
+                              <span className="flex-1 text-slate-700">{item.item_text}</span>
+                              <button
+                                type="button"
+                                title="แนบรูปภาพ/คอมเมนต์"
+                                onClick={() => toggleCommentBox(item.id)}
+                                className={`shrink-0 rounded-full px-1.5 py-0.5 text-xs ${
+                                  commentOpen || note?.comment ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
+                                }`}
+                              >
+                                💬
+                              </button>
+                            </div>
+                            {commentOpen && (
+                              <textarea
+                                disabled={readOnly}
+                                value={note?.comment ?? ''}
+                                onChange={(e) => updateItemComment(item.id, e.target.value)}
+                                onBlur={() => commitItemComment()}
+                                rows={2}
+                                placeholder="สิ่งที่กรรมการพบ / ข้อสังเกตเพิ่มเติม..."
+                                className="mt-1.5 w-full rounded-md border border-slate-300 p-1.5 text-xs"
+                              />
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="whitespace-pre-line text-slate-600">{scoreDescriptions[lvl] || '—'}</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="mb-4">
+            <div className="mb-1 flex items-center justify-between">
+              <p className="text-sm font-semibold text-slate-600">
+                รูปภาพประกอบ ({photos.length}/{MAX_PHOTOS_PER_TOPIC})
+              </p>
+              {!readOnly && photos.length < MAX_PHOTOS_PER_TOPIC && (
+                <label className="cursor-pointer rounded-lg bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+                  {uploadingPhoto ? 'กำลังอัปโหลด...' : '+ แนบรูป'}
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingPhoto} onChange={handlePhotoChange} />
+                </label>
+              )}
+            </div>
+            {photoError && <p className="mb-2 text-xs text-red-600">{photoError}</p>}
+            {photos.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {photos.map((p) => (
+                  <div key={p.id} className="group relative h-20 w-20 overflow-hidden rounded-lg border border-slate-200">
+                    <img src={getTopicPhotoUrl(p.file_path)} alt={p.file_name ?? ''} className="h-full w-full object-cover" />
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePhoto(p)}
+                        className="absolute right-0.5 top-0.5 rounded-full bg-black/60 px-1.5 text-xs text-white"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+            <p className="mt-1 text-xs text-slate-400">ไฟล์ละไม่เกิน 30 MB · สูงสุด {MAX_PHOTOS_PER_TOPIC} รูปต่อหัวข้อ (ใช้ร่วมกันทั้งคณะกรรมการ)</p>
           </div>
 
           {topic.evidence.length > 0 && (
@@ -204,6 +383,14 @@ export default function TopicScoreCard({
       )}
     </div>
   )
+}
+
+function groupItemsByLevel(items: TopicScoreItem[]): Record<'0' | '1' | '2', TopicScoreItem[]> {
+  const grouped: Record<'0' | '1' | '2', TopicScoreItem[]> = { '0': [], '1': [], '2': [] }
+  for (const item of items) {
+    grouped[String(item.score_level) as '0' | '1' | '2'].push(item)
+  }
+  return grouped
 }
 
 function getScoreDescriptions(topic: TopicWithEvidence): Record<'0' | '1' | '2', string> {

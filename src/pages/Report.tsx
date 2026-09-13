@@ -47,11 +47,11 @@ export default function Report() {
   const flatTopics = useMemo(() => (standard ? allTopicsFlat(standard) : []), [standard])
   const aggregates = useMemo(() => aggregateAll(flatTopics.map((t) => t.id), scores), [flatTopics, scores])
   const evaluators = participants.filter((p) => p.role !== 'viewer')
-  const [exportingDocx, setExportingDocx] = useState(false)
+  const [exportingDocx, setExportingDocx] = useState<'with' | 'without' | null>(null)
 
-  async function exportDocx() {
+  async function exportDocx(includeComments: boolean) {
     if (!standard || !round) return
-    setExportingDocx(true)
+    setExportingDocx(includeComments ? 'with' : 'without')
     try {
       const blob = await generateReportDocx({
         round,
@@ -61,10 +61,12 @@ export default function Report() {
         evaluators,
         grandTotal: flatTopics.reduce((sum, t) => sum + (aggregates.get(t.id)?.avgScore ?? 0), 0),
         mustFailCount: flatTopics.filter((t) => aggregates.get(t.id)?.mustPassFinal === false).length,
+        includeComments,
       })
-      downloadBlob(blob, `pcu-report-${round.join_code}.docx`)
+      const suffix = includeComments ? 'with-comments' : 'no-comments'
+      downloadBlob(blob, `pcu-report-${round.join_code}-${suffix}.docx`)
     } finally {
-      setExportingDocx(false)
+      setExportingDocx(null)
     }
   }
 
@@ -110,11 +112,18 @@ export default function Report() {
           ดาวน์โหลด CSV
         </button>
         <button
-          onClick={exportDocx}
-          disabled={exportingDocx}
+          onClick={() => exportDocx(false)}
+          disabled={exportingDocx !== null}
           className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
         >
-          {exportingDocx ? 'กำลังสร้างไฟล์...' : 'ดาวน์โหลด Word (.docx)'}
+          {exportingDocx === 'without' ? 'กำลังสร้างไฟล์...' : 'ดาวน์โหลด Word (ไม่มี comment)'}
+        </button>
+        <button
+          onClick={() => exportDocx(true)}
+          disabled={exportingDocx !== null}
+          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
+        >
+          {exportingDocx === 'with' ? 'กำลังสร้างไฟล์...' : 'ดาวน์โหลด Word (มี comment)'}
         </button>
         <button onClick={() => window.print()} className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white">
           พิมพ์ / บันทึกเป็น PDF
