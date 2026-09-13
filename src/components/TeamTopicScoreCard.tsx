@@ -268,20 +268,24 @@ export default function TeamTopicScoreCard({
                     <div className="mb-1.5 whitespace-pre-line rounded-md bg-white p-1.5 text-xs text-slate-600">{note.comment}</div>
                   )}
                   {!readOnly && (
-                    <div className="flex gap-1">
-                      <input
+                    <div className="flex items-end gap-1">
+                      <textarea
                         value={newComment[item.id] ?? ''}
                         onChange={(e) => setNewComment((prev) => ({ ...prev, [item.id]: e.target.value }))}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') submitItemComment(item.id)
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            submitItemComment(item.id)
+                          }
                         }}
-                        placeholder="พิมพ์คอมเมนต์แล้วกด Enter..."
-                        className="w-full rounded-md border border-slate-300 p-1.5 text-xs"
+                        rows={2}
+                        placeholder="พิมพ์คอมเมนต์แล้วกด Enter (Shift+Enter ขึ้นบรรทัดใหม่)..."
+                        className="w-full resize-y rounded-md border border-slate-300 p-1.5 text-xs"
                       />
                       <button
                         type="button"
                         onClick={() => submitItemComment(item.id)}
-                        className="shrink-0 rounded-md bg-slate-700 px-2 text-xs font-medium text-white"
+                        className="shrink-0 rounded-md bg-slate-700 px-2 py-1.5 text-xs font-medium text-white"
                       >
                         ส่ง
                       </button>
@@ -458,17 +462,25 @@ export default function TeamTopicScoreCard({
             <p className="mb-1 text-sm font-semibold text-slate-600">เหตุผล / บันทึกเพิ่มเติม (ช่วยกันคอมเมนต์ได้)</p>
             {comment && <div className="mb-1.5 whitespace-pre-line rounded-lg bg-slate-50 p-2 text-sm text-slate-600">{comment}</div>}
             {!readOnly && (
-              <div className="flex gap-1.5">
-                <input
+              <div className="flex items-end gap-1.5">
+                <textarea
                   value={newTopicComment}
                   onChange={(e) => setNewTopicComment(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') submitTopicComment()
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      submitTopicComment()
+                    }
                   }}
-                  placeholder="พิมพ์แล้วกด Enter เพื่อเพิ่มความเห็น..."
-                  className="w-full rounded-lg border border-slate-300 p-2 text-sm"
+                  rows={2}
+                  placeholder="พิมพ์แล้วกด Enter เพื่อเพิ่มความเห็น (Shift+Enter ขึ้นบรรทัดใหม่)..."
+                  className="w-full resize-y rounded-lg border border-slate-300 p-2 text-sm"
                 />
-                <button type="button" onClick={submitTopicComment} className="shrink-0 rounded-lg bg-slate-700 px-3 text-sm font-medium text-white">
+                <button
+                  type="button"
+                  onClick={submitTopicComment}
+                  className="shrink-0 rounded-lg bg-slate-700 px-3 py-2 text-sm font-medium text-white"
+                >
                   ส่ง
                 </button>
               </div>

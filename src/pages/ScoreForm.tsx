@@ -267,14 +267,24 @@ export default function ScoreForm() {
     const mustLabel = !hasMust ? null : r?.mustPass === true ? 'ผ่าน' : r?.mustPass === false ? 'ไม่ผ่าน' : '-'
     const ciLabel = r?.isNa ? 'NA' : (r?.score ?? '-')
     const mustClass = mustLabel === 'ผ่าน' ? 'text-emerald-600' : mustLabel === 'ไม่ผ่าน' ? 'text-red-600' : 'text-slate-400'
-    const ciClass = ciLabel === '-' ? 'text-slate-400' : 'text-slate-700'
+    // Matches the CI score buttons' own colors (SCORE_COLOR in TopicScoreCard): 0=amber, 1=orange, 2=emerald, NA=sky.
+    const ciClass =
+      ciLabel === 0
+        ? 'text-amber-600'
+        : ciLabel === 1
+          ? 'text-orange-600'
+          : ciLabel === 2
+            ? 'text-emerald-600'
+            : ciLabel === 'NA'
+              ? 'text-sky-600'
+              : 'text-slate-400'
     return (
       <button
         type="button"
         onClick={() => goToTopic(topic.id, parentBlockId)}
-        className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] font-medium text-slate-600 hover:bg-slate-50"
+        className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] font-bold text-slate-600 hover:bg-slate-50"
       >
-        <span className="truncate font-mono text-slate-400">{topic.code}</span>
+        <span className="truncate font-mono font-medium text-slate-400">{topic.code}</span>
         <span className="flex shrink-0 items-center gap-1">
           {mustLabel !== null && <span className={mustClass}>{mustLabel}</span>}
           <span className={ciClass}>| {ciLabel}</span>
