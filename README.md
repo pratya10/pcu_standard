@@ -10,7 +10,7 @@
 1. สร้างโปรเจกต์ใหม่ที่ [supabase.com](https://supabase.com) (แผนฟรีเพียงพอสำหรับเริ่มต้น)
 2. ไปที่ **SQL Editor** แล้วรันไฟล์ `supabase/migrations/0001_init.sql` ทั้งไฟล์ เพื่อสร้างตารางและ RLS policy
 3. คัดลอกไฟล์ `.env.example` เป็น `.env` แล้วกรอกค่า `VITE_SUPABASE_URL` และ `VITE_SUPABASE_ANON_KEY` (ดูได้จาก Project Settings → API)
-4. รัน seed script เพื่อโหลดเนื้อหามาตรฐาน (29 หัวข้อ) เข้าตาราง `categories` / `topics`:
+4. รัน seed script เพื่อโหลดเนื้อหามาตรฐาน (26 หัวข้อ) เข้าตาราง `categories` / `topics`:
 
    ```bash
    SUPABASE_URL=https://xxxx.supabase.co \
