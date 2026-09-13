@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient'
 import { loadStandardByVersionId, allTopicsFlat } from '../lib/loadStandard'
 import { fetchScoresForParticipant, upsertScore } from '../lib/scoresApi'
 import { fetchTeamScoresForRound, subscribeToTeamScores } from '../lib/teamScoresApi'
+import { subscribeToPresence, type PresenceInfo } from '../lib/presence'
 import { getParticipantSession } from '../lib/participantSession'
 import type { AssessmentRound, FullStandard, Participant, Score, TeamScore } from '../types'
 import TopicScoreCard from '../components/TopicScoreCard'
@@ -38,6 +39,7 @@ export default function ScoreForm() {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [navOpen, setNavOpen] = useState(false)
+  const [online, setOnline] = useState<PresenceInfo[]>([])
 
   const session = roundId ? getParticipantSession(roundId) : null
   const collaborative = round?.scoring_mode === 'collaborative'
@@ -88,6 +90,13 @@ export default function ScoreForm() {
     return unsubscribe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundId, collaborative])
+
+  useEffect(() => {
+    if (!roundId || !session) return
+    const unsubscribe = subscribeToPresence(roundId, { participantId: session.participantId, name: session.name, role: session.role }, setOnline)
+    return unsubscribe
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundId, session?.participantId])
 
   const flatTopics = useMemo(() => (standard ? allTopicsFlat(standard) : []), [standard])
   const scoreByTopic = useMemo(() => new Map(scores.map((s) => [s.topic_id, s])), [scores])
@@ -399,6 +408,20 @@ export default function ScoreForm() {
             />
           </div>
           <p className="mt-1.5 text-[11px] text-slate-400">ระบบบันทึกผลอัตโนมัติทันทีที่กดเลือก ไม่ต้องกด Save</p>
+          {online.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] text-slate-400">ออนไลน์ตอนนี้:</span>
+              {online.map((p) => (
+                <span
+                  key={p.participantId}
+                  className="flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700"
+                >
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                  {p.name}
+                </span>
+              ))}
+            </div>
+          )}
           {collaborative && (
             <p className="mt-1 text-[11px] font-medium text-sky-600">โหมดทีมคณะกรรมช่วยกัน — ทุกคนเห็นและแก้ไขคะแนนชุดเดียวกันแบบ real-time</p>
           )}
