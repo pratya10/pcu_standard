@@ -195,7 +195,13 @@ export default function AdminRoundDetail() {
                 key={s}
                 disabled={updating || round.status === s}
                 onClick={() => setStatus(s)}
-                className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${round.status === s ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-300 text-slate-500'}`}
+                className={`rounded-lg border px-3 py-1.5 text-sm font-medium ${
+                  round.status === s
+                    ? s === 'completed'
+                      ? 'border-red-600 bg-red-50 text-red-700'
+                      : 'border-emerald-600 bg-emerald-50 text-emerald-700'
+                    : 'border-slate-300 text-slate-500'
+                }`}
               >
                 {s === 'in_progress' ? 'กำลังประเมิน' : 'ปิดรับคะแนน (เสร็จสิ้น)'}
               </button>
