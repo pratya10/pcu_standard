@@ -13,6 +13,7 @@ export default function AdminNewRound() {
   const [versionId, setVersionId] = useState('')
   const [name, setName] = useState('')
   const [surveyDate, setSurveyDate] = useState('')
+  const [customJoinCode, setCustomJoinCode] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -35,12 +36,40 @@ export default function AdminNewRound() {
       setError('กรุณาเลือกหน่วยบริการและกรอกชื่อรอบการประเมิน')
       return
     }
+    const custom = customJoinCode.trim().toUpperCase()
+    if (custom && !/^[A-Z0-9]{3,12}$/.test(custom)) {
+      setError('รหัสเข้าร่วมที่กำหนดเองต้องเป็นตัวอักษร A-Z หรือตัวเลข ยาว 3-12 ตัว')
+      return
+    }
     setSaving(true)
     setError(null)
 
     const {
       data: { user },
     } = await supabase.auth.getUser()
+
+    if (custom) {
+      const { data, error } = await supabase
+        .from('assessment_rounds')
+        .insert({
+          facility_id: facilityId,
+          standard_version_id: versionId,
+          name: name.trim(),
+          survey_date: surveyDate || null,
+          join_code: custom,
+          status: 'in_progress',
+          created_by: user?.id ?? null,
+        })
+        .select()
+        .single()
+      setSaving(false)
+      if (error) {
+        setError(error.message.includes('duplicate') ? `รหัสเข้าร่วม "${custom}" ถูกใช้ไปแล้ว กรุณาเลือกรหัสอื่น` : 'สร้างรอบการประเมินไม่สำเร็จ: ' + error.message)
+        return
+      }
+      navigate(`/admin/rounds/${data.id}`)
+      return
+    }
 
     for (let attempt = 0; attempt < 5; attempt++) {
       const joinCode = randomJoinCode()
@@ -124,6 +153,20 @@ export default function AdminNewRound() {
             onChange={(e) => setSurveyDate(e.target.value)}
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
           />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-600">
+            รหัสเข้าร่วม (Join Code) — กำหนดเองได้ <span className="text-slate-400">(ไม่บังคับ)</span>
+          </label>
+          <input
+            value={customJoinCode}
+            onChange={(e) => setCustomJoinCode(e.target.value.toUpperCase())}
+            placeholder="ปล่อยว่างไว้เพื่อให้ระบบสุ่มให้อัตโนมัติ"
+            className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-sm tracking-widest uppercase"
+            maxLength={12}
+          />
+          <p className="mt-1 text-xs text-slate-400">A-Z หรือตัวเลข 3-12 ตัว เช่น PAOO2569</p>
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}

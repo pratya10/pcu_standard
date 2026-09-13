@@ -18,6 +18,9 @@ export default function AdminRoundDetail() {
   const [editName, setEditName] = useState('')
   const [editDate, setEditDate] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [editingCode, setEditingCode] = useState(false)
+  const [editCode, setEditCode] = useState('')
+  const [codeError, setCodeError] = useState<string | null>(null)
 
   async function load() {
     if (!roundId) return
@@ -74,6 +77,25 @@ export default function AdminRoundDetail() {
     await load()
     setUpdating(false)
     setEditingInfo(false)
+  }
+
+  async function saveJoinCode() {
+    if (!roundId) return
+    const code = editCode.trim().toUpperCase()
+    if (!/^[A-Z0-9]{3,12}$/.test(code)) {
+      setCodeError('รหัสต้องเป็นตัวอักษร A-Z หรือตัวเลข ยาว 3-12 ตัว')
+      return
+    }
+    setUpdating(true)
+    setCodeError(null)
+    const { error } = await supabase.from('assessment_rounds').update({ join_code: code }).eq('id', roundId)
+    setUpdating(false)
+    if (error) {
+      setCodeError(error.message.includes('duplicate') ? `รหัส "${code}" ถูกใช้ไปแล้ว กรุณาเลือกรหัสอื่น` : 'บันทึกไม่สำเร็จ: ' + error.message)
+      return
+    }
+    await load()
+    setEditingCode(false)
   }
 
   async function handleDeleteRound() {
@@ -167,7 +189,48 @@ export default function AdminRoundDetail() {
 
         <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-5">
           <p className="mb-2 text-sm text-slate-500">รหัสเข้าร่วม (Join Code)</p>
-          <p className="mb-3 font-mono text-4xl font-bold tracking-widest text-slate-800">{round.join_code}</p>
+          {editingCode ? (
+            <div className="mb-3 flex flex-col items-center gap-2">
+              <input
+                value={editCode}
+                onChange={(e) => setEditCode(e.target.value.toUpperCase())}
+                maxLength={12}
+                className="w-40 rounded-lg border border-slate-300 px-2 py-1 text-center font-mono text-xl tracking-widest uppercase"
+              />
+              {codeError && <p className="text-xs text-red-600">{codeError}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={saveJoinCode}
+                  disabled={updating}
+                  className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  บันทึก
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingCode(false)
+                    setCodeError(null)
+                  }}
+                  className="rounded-lg border border-slate-300 px-3 py-1 text-xs text-slate-500"
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mb-3 flex items-center gap-2">
+              <p className="font-mono text-4xl font-bold tracking-widest text-slate-800">{round.join_code}</p>
+              <button
+                onClick={() => {
+                  setEditCode(round.join_code)
+                  setEditingCode(true)
+                }}
+                className="text-xs text-emerald-700 hover:underline"
+              >
+                แก้ไข
+              </button>
+            </div>
+          )}
           <QRCodeSVG value={joinUrl} size={120} />
           <button
             onClick={() => {
