@@ -230,7 +230,7 @@ export default function AdminRoundDetail() {
           )}
         </div>
 
-        <div className="mx-auto flex w-full max-w-[75%] flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-5">
+        <div className="flex w-full flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-5">
           <p className="mb-2 text-sm text-slate-500">รหัสเข้าร่วม (Join Code)</p>
           {editingCode ? (
             <div className="mb-3 flex flex-col items-center gap-2">
