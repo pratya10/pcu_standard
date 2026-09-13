@@ -488,7 +488,9 @@ export default function ScoreForm() {
             />
           </div>
           <p className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-400">
-            <Icon name="save" className="!text-sm" /> Save อัตโนมัติ
+            <span className="flex items-center gap-1 font-medium text-emerald-600">
+              <Icon name="save" className="!text-sm animate-pulse" /> Save อัตโนมัติ
+            </span>
             {collaborative && (
               <>
                 {' | '}
