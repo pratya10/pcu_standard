@@ -19,9 +19,9 @@ export default function Home() {
 
       <Link
         to="/admin/login"
-        className="rounded-2xl border border-slate-300 bg-white px-6 py-4 text-center font-medium text-slate-600 active:scale-[0.98]"
+        className="rounded-2xl border border-slate-300 bg-white px-6 py-2 text-center text-sm font-medium text-slate-600 active:scale-[0.98]"
       >
-        เข้าสู่ระบบผู้ดูแล (สสอ. / สสจ.)
+        ผู้ดูแลระบบ
       </Link>
     </div>
   )
