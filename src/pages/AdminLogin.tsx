@@ -62,7 +62,7 @@ export default function AdminLogin() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 py-12">
-      <BrandLogo className="mx-auto mb-4 h-16 w-auto object-contain" />
+      <BrandLogo className="mx-auto mb-4 h-[96px] w-auto object-contain" />
       <h1 className="mb-6 text-center text-xl font-bold text-slate-800">เข้าสู่ระบบผู้ดูแล</h1>
 
       {error && <p className="mb-3 text-center text-sm text-red-600">{error}</p>}
