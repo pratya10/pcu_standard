@@ -3,8 +3,10 @@ import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { loadStandardByVersionId, allTopicsFlat } from '../lib/loadStandard'
 import { fetchScoresForRound } from '../lib/scoresApi'
+import { fetchTeamScoreAuditForRound, fetchTeamScoresForRound, teamScoreToScore } from '../lib/teamScoresApi'
 import { aggregateAll, formatAvg } from '../lib/aggregate'
-import type { AssessmentRound, FullStandard, Facility, Participant, Score, TopicPhoto } from '../types'
+import type { AssessmentRound, FullStandard, Facility, Participant, Score, TeamScoreAudit, TopicPhoto } from '../types'
+import { formatThaiDateTime } from '../lib/thaiDate'
 import BrandLogo from '../components/BrandLogo'
 import { downloadBlob, generateReportDocx } from '../lib/docxExport'
 import { formatThaiDate } from '../lib/thaiDate'
@@ -18,6 +20,7 @@ export default function Report() {
   const [scores, setScores] = useState<Score[]>([])
   const [participants, setParticipants] = useState<Participant[]>([])
   const [photos, setPhotos] = useState<TopicPhoto[]>([])
+  const [auditLog, setAuditLog] = useState<TeamScoreAudit[]>([])
   const [loading, setLoading] = useState(true)
   const [printMode, setPrintMode] = useState<'summary' | 'detailed'>('summary')
 
@@ -31,19 +34,22 @@ export default function Report() {
         setLoading(false)
         return
       }
-      const [std, sc, { data: fac }, { data: parts }, ph] = await Promise.all([
-        loadStandardByVersionId(roundRow.standard_version_id),
-        fetchScoresForRound(rid),
-        supabase.from('facilities').select('*').eq('id', roundRow.facility_id).single(),
+      const round = roundRow as AssessmentRound
+      const [std, sc, { data: fac }, { data: parts }, ph, audit] = await Promise.all([
+        loadStandardByVersionId(round.standard_version_id),
+        round.scoring_mode === 'collaborative' ? fetchTeamScoresForRound(rid).then((rows) => rows.map(teamScoreToScore)) : fetchScoresForRound(rid),
+        supabase.from('facilities').select('*').eq('id', round.facility_id).single(),
         supabase.from('participants').select('*').eq('round_id', rid).order('joined_at'),
         listRoundPhotos(rid),
+        round.scoring_mode === 'collaborative' ? fetchTeamScoreAuditForRound(rid) : Promise.resolve([]),
       ])
-      setRound(roundRow as AssessmentRound)
+      setRound(round)
       setStandard(std)
       setScores(sc)
       setFacility((fac as Facility) ?? null)
       setParticipants((parts as Participant[]) ?? [])
       setPhotos(ph)
+      setAuditLog(audit)
       setLoading(false)
     }
     load()
@@ -101,6 +107,7 @@ export default function Report() {
         mustFailCount: flatTopics.filter((t) => aggregates.get(t.id)?.mustPassFinal === false).length,
         includeComments,
         photosByTopic: includeComments ? photosByTopic : undefined,
+        auditLog: includeComments ? auditLog : undefined,
       })
       const suffix = includeComments ? 'with-comments' : 'no-comments'
       downloadBlob(blob, `pcu-report-${round.join_code}-${suffix}.docx`)
@@ -321,6 +328,26 @@ export default function Report() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {printMode === 'detailed' && auditLog.length > 0 && (
+        <div className="mb-6 break-inside-avoid">
+          <h2 className="mb-2 text-sm font-bold text-slate-800">ประวัติการแก้ไขคะแนน (โหมดทีมคณะกรรมช่วยกัน)</h2>
+          <ul className="list-disc pl-5 text-sm text-slate-600">
+            {auditLog.map((a) => {
+              const topicLabel = flatTopics.find((t) => t.id === a.topic_id)
+              const fieldLabel = a.field === 'score' ? 'คะแนน' : a.field === 'must_pass' ? 'ผล The Must' : `ข้อย่อย "${itemTextById.get(a.item_id ?? '') ?? ''}"`
+              const describe = (v: unknown) => (a.field === 'must_pass' ? (v ? 'ผ่าน' : 'ไม่ผ่าน') : a.field === 'item_checked' ? (v ? 'มี' : 'ไม่มี') : String(v))
+              return (
+                <li key={a.id}>
+                  <span className="font-mono text-xs text-slate-400">{topicLabel?.code}</span> {topicLabel?.name_th} — {fieldLabel}: เปลี่ยนจาก "
+                  {describe(a.old_value)}" เป็น "{describe(a.new_value)}" โดย {evaluatorNameById.get(a.participant_id ?? '') ?? 'กรรมการ'} เมื่อ{' '}
+                  {formatThaiDateTime(a.created_at)}
+                </li>
+              )
+            })}
+          </ul>
         </div>
       )}
 

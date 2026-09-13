@@ -3,9 +3,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { loadStandardByVersionId, allTopicsFlat } from '../lib/loadStandard'
 import { fetchScoresForParticipant, upsertScore } from '../lib/scoresApi'
+import { fetchTeamScoresForRound, subscribeToTeamScores } from '../lib/teamScoresApi'
 import { getParticipantSession } from '../lib/participantSession'
-import type { AssessmentRound, FullStandard, Score } from '../types'
+import type { AssessmentRound, FullStandard, Participant, Score, TeamScore } from '../types'
 import TopicScoreCard from '../components/TopicScoreCard'
+import TeamTopicScoreCard from '../components/TeamTopicScoreCard'
 
 type SectionTopic = FullStandard['categories'][number]['topics'][number]
 
@@ -17,6 +19,8 @@ type Section = {
   topics: SectionTopic[]
 }
 
+type TopicResult = { score: number | null; isNa: boolean; mustPass: boolean | null } | undefined
+
 const RAINBOW = ['#e11d48', '#f97316', '#eab308', '#22c55e', '#0ea5e9', '#8b5cf6']
 
 export default function ScoreForm() {
@@ -25,12 +29,15 @@ export default function ScoreForm() {
   const [round, setRound] = useState<AssessmentRound | null>(null)
   const [standard, setStandard] = useState<FullStandard | null>(null)
   const [scores, setScores] = useState<Score[]>([])
+  const [teamScores, setTeamScores] = useState<TeamScore[]>([])
+  const [participants, setParticipants] = useState<Participant[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
   const [navOpen, setNavOpen] = useState(false)
 
   const session = roundId ? getParticipantSession(roundId) : null
+  const collaborative = round?.scoring_mode === 'collaborative'
 
   useEffect(() => {
     if (!roundId) return
@@ -47,24 +54,55 @@ export default function ScoreForm() {
         setLoading(false)
         return
       }
-      const [std, sc] = await Promise.all([
-        loadStandardByVersionId(roundRow.standard_version_id),
-        fetchScoresForParticipant(rid, session!.participantId),
+      const round = roundRow as AssessmentRound
+      const [std, parts] = await Promise.all([
+        loadStandardByVersionId(round.standard_version_id),
+        supabase.from('participants').select('*').eq('round_id', rid).order('joined_at'),
       ])
-      setRound(roundRow as AssessmentRound)
+      setParticipants((parts.data as Participant[]) ?? [])
+      if (round.scoring_mode === 'collaborative') {
+        setTeamScores(await fetchTeamScoresForRound(rid))
+      } else {
+        setScores(await fetchScoresForParticipant(rid, session!.participantId))
+      }
+      setRound(round)
       setStandard(std)
-      setScores(sc)
       setLoading(false)
     }
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundId])
 
+  useEffect(() => {
+    if (!roundId || !collaborative) return
+    const unsubscribe = subscribeToTeamScores(roundId, (row, eventType) => {
+      setTeamScores((prev) => {
+        if (eventType === 'DELETE') return prev.filter((s) => s.id !== row.id)
+        const others = prev.filter((s) => s.id !== row.id)
+        return [...others, row]
+      })
+    })
+    return unsubscribe
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundId, collaborative])
+
   const flatTopics = useMemo(() => (standard ? allTopicsFlat(standard) : []), [standard])
   const scoreByTopic = useMemo(() => new Map(scores.map((s) => [s.topic_id, s])), [scores])
+  const teamScoreByTopic = useMemo(() => new Map(teamScores.map((s) => [s.topic_id, s])), [teamScores])
+  const participantNameById = useMemo(() => new Map(participants.map((p) => [p.id, p.name])), [participants])
+
+  function resultFor(topicId: string): TopicResult {
+    if (collaborative) {
+      const s = teamScoreByTopic.get(topicId)
+      return s ? { score: s.score, isNa: s.is_na, mustPass: s.must_pass } : undefined
+    }
+    const s = scoreByTopic.get(topicId)
+    return s ? { score: s.score, isNa: s.is_na, mustPass: s.must_pass } : undefined
+  }
+
   const answeredCount = flatTopics.filter((t) => {
-    const s = scoreByTopic.get(t.id)
-    return !!s && (s.is_na || s.score !== null)
+    const r = resultFor(t.id)
+    return !!r && (r.isNa || r.score !== null)
   }).length
 
   // Rainbow-ordered sections for the jump nav: หมวด 1, หมวด 2.1-2.4, หมวด 3.
@@ -104,16 +142,16 @@ export default function ScoreForm() {
     let mustTotal = 0
     let mustAnswered = 0
     for (const t of section.topics) {
-      const s = scoreByTopic.get(t.id)
-      if (!s?.is_na) {
+      const s = resultFor(t.id)
+      if (!s?.isNa) {
         ciAchieved += s?.score ?? 0
         ciMax += 2
       }
-      if (s && (s.is_na || s.score !== null)) ciAnswered++
+      if (s && (s.isNa || s.score !== null)) ciAnswered++
       if (t.must_text) {
         mustTotal++
-        if (s?.must_pass === true) mustPass++
-        if (s?.must_pass !== null && s?.must_pass !== undefined) mustAnswered++
+        if (s?.mustPass === true) mustPass++
+        if (s?.mustPass !== null && s?.mustPass !== undefined) mustAnswered++
       }
     }
     return { ciAchieved, ciMax, ciAnswered, mustPass, mustTotal, mustAnswered }
@@ -155,6 +193,13 @@ export default function ScoreForm() {
     setScores((prev) => {
       const others = prev.filter((s) => s.topic_id !== topicId)
       return [...others, saved]
+    })
+  }
+
+  function handleTeamSaved(updated: TeamScore) {
+    setTeamScores((prev) => {
+      const others = prev.filter((s) => s.id !== updated.id)
+      return [...others, updated]
     })
   }
 
@@ -261,6 +306,9 @@ export default function ScoreForm() {
             />
           </div>
           <p className="mt-1.5 text-[11px] text-slate-400">ระบบบันทึกผลอัตโนมัติทันทีที่กดเลือก ไม่ต้องกด Save</p>
+          {collaborative && (
+            <p className="mt-1 text-[11px] font-medium text-sky-600">โหมดทีมคณะกรรมช่วยกัน — ทุกคนเห็นและแก้ไขคะแนนชุดเดียวกันแบบ real-time</p>
+          )}
           <Link to={`/round/${roundId}/live`} className="mt-2 inline-block text-xs text-emerald-700 underline">
             ดูคะแนนรวมแบบ Real-time →
           </Link>
@@ -277,18 +325,33 @@ export default function ScoreForm() {
               {s.headerLabel}
             </h2>
             <div className="mb-3 flex flex-col gap-2">
-              {s.topics.map((t) => (
-                <TopicScoreCard
-                  key={t.id}
-                  topic={t}
-                  existing={scoreByTopic.get(t.id)}
-                  readOnly={readOnly}
-                  roundId={roundId!}
-                  participantId={session.participantId}
-                  accentColor={s.color}
-                  onSave={(draft) => handleSave(t.id, draft)}
-                />
-              ))}
+              {s.topics.map((t) =>
+                collaborative ? (
+                  <TeamTopicScoreCard
+                    key={t.id}
+                    topic={t}
+                    teamScore={teamScoreByTopic.get(t.id)}
+                    readOnly={readOnly}
+                    roundId={roundId!}
+                    participantId={session.participantId}
+                    participantName={session.name}
+                    participantNameById={participantNameById}
+                    accentColor={s.color}
+                    onSaved={handleTeamSaved}
+                  />
+                ) : (
+                  <TopicScoreCard
+                    key={t.id}
+                    topic={t}
+                    existing={scoreByTopic.get(t.id)}
+                    readOnly={readOnly}
+                    roundId={roundId!}
+                    participantId={session.participantId}
+                    accentColor={s.color}
+                    onSave={(draft) => handleSave(t.id, draft)}
+                  />
+                ),
+              )}
             </div>
           </div>
         ))}

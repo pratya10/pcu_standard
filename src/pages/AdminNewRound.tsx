@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import type { Facility, StandardVersion } from '../types'
+import type { Facility, ScoringMode, StandardVersion } from '../types'
 import { randomJoinCode } from '../lib/participantSession'
 import AdminLayout from '../components/AdminLayout'
 
@@ -14,6 +14,7 @@ export default function AdminNewRound() {
   const [name, setName] = useState('')
   const [surveyDate, setSurveyDate] = useState('')
   const [customJoinCode, setCustomJoinCode] = useState('')
+  const [scoringMode, setScoringMode] = useState<ScoringMode>('average')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -58,6 +59,7 @@ export default function AdminNewRound() {
           survey_date: surveyDate || null,
           join_code: custom,
           status: 'in_progress',
+          scoring_mode: scoringMode,
           created_by: user?.id ?? null,
         })
         .select()
@@ -82,6 +84,7 @@ export default function AdminNewRound() {
           survey_date: surveyDate || null,
           join_code: joinCode,
           status: 'in_progress',
+          scoring_mode: scoringMode,
           created_by: user?.id ?? null,
         })
         .select()
@@ -152,6 +155,29 @@ export default function AdminNewRound() {
             onChange={(e) => setSurveyDate(e.target.value)}
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
           />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-600">หลักการประเมิน</label>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => setScoringMode('average')}
+              className={`rounded-lg border-2 p-3 text-left text-sm ${scoringMode === 'average' ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200'}`}
+            >
+              <p className="font-semibold text-slate-800">ค่าเฉลี่ยกรรมการทุกคน</p>
+              <p className="mt-0.5 text-xs text-slate-500">กรรมการแต่ละคนประเมินทุกข้อแยกกัน ไม่เห็นของกัน แล้วนำผลมาเฉลี่ย</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setScoringMode('collaborative')}
+              className={`rounded-lg border-2 p-3 text-left text-sm ${scoringMode === 'collaborative' ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200'}`}
+            >
+              <p className="font-semibold text-slate-800">ทีมคณะกรรมช่วยกัน</p>
+              <p className="mt-0.5 text-xs text-slate-500">ทุกคนเห็นคะแนนกันแบบ real-time ช่วยกันให้คะแนนชุดเดียว มีระบบยืนยันก่อนทับค่าที่มีอยู่แล้ว</p>
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-amber-600">เลือกได้ครั้งเดียวตอนสร้างรอบ เปลี่ยนภายหลังไม่ได้</p>
         </div>
 
         <div>

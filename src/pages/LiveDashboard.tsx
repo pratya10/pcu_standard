@@ -3,8 +3,9 @@ import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { loadStandardByVersionId, allTopicsFlat } from '../lib/loadStandard'
 import { fetchScoresForRound } from '../lib/scoresApi'
+import { fetchTeamScoresForRound, teamScoreToScore } from '../lib/teamScoresApi'
 import { aggregateAll, formatAvg } from '../lib/aggregate'
-import type { AssessmentRound, FullStandard, Facility, Participant, Score } from '../types'
+import type { AssessmentRound, FullStandard, Facility, Participant, Score, TeamScore } from '../types'
 
 export default function LiveDashboard() {
   const { roundId } = useParams<{ roundId: string }>()
@@ -25,13 +26,14 @@ export default function LiveDashboard() {
         setLoading(false)
         return
       }
+      const round = roundRow as AssessmentRound
       const [std, sc, { data: fac }, { data: parts }] = await Promise.all([
-        loadStandardByVersionId(roundRow.standard_version_id),
-        fetchScoresForRound(rid),
-        supabase.from('facilities').select('*').eq('id', roundRow.facility_id).single(),
+        loadStandardByVersionId(round.standard_version_id),
+        round.scoring_mode === 'collaborative' ? fetchTeamScoresForRound(rid).then((rows) => rows.map(teamScoreToScore)) : fetchScoresForRound(rid),
+        supabase.from('facilities').select('*').eq('id', round.facility_id).single(),
         supabase.from('participants').select('*').eq('round_id', rid).order('joined_at'),
       ])
-      setRound(roundRow as AssessmentRound)
+      setRound(round)
       setStandard(std)
       setScores(sc)
       setFacility((fac as Facility) ?? null)
@@ -42,13 +44,14 @@ export default function LiveDashboard() {
   }, [roundId])
 
   useEffect(() => {
-    if (!roundId) return
+    if (!roundId || !round) return
+    const scoreTable = round.scoring_mode === 'collaborative' ? 'team_scores' : 'scores'
     const channel = supabase
       .channel(`round-${roundId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'scores', filter: `round_id=eq.${roundId}` }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: scoreTable, filter: `round_id=eq.${roundId}` }, (payload) => {
         setScores((prev) => {
-          if (payload.eventType === 'DELETE') return prev.filter((s) => s.id !== (payload.old as Score).id)
-          const row = payload.new as Score
+          if (payload.eventType === 'DELETE') return prev.filter((s) => s.id !== (payload.old as Score | TeamScore).id)
+          const row = round.scoring_mode === 'collaborative' ? teamScoreToScore(payload.new as TeamScore) : (payload.new as Score)
           const others = prev.filter((s) => s.id !== row.id)
           return [...others, row]
         })
@@ -69,7 +72,8 @@ export default function LiveDashboard() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [roundId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundId, round?.scoring_mode])
 
   const flatTopics = useMemo(() => (standard ? allTopicsFlat(standard) : []), [standard])
   const aggregates = useMemo(() => aggregateAll(flatTopics.map((t) => t.id), scores), [flatTopics, scores])
@@ -126,7 +130,7 @@ export default function LiveDashboard() {
                       <p className="truncate text-sm text-slate-700">
                         <span className="font-mono text-xs text-slate-400">{t.code}</span> {t.name_th}
                       </p>
-                      {evaluators.length > 0 && (
+                      {round.scoring_mode !== 'collaborative' && evaluators.length > 0 && (
                         <div className="mt-1 flex flex-wrap gap-1">
                           {evaluators.map((p) => {
                             const s = agg?.scores.find((sc) => sc.participant_id === p.id)

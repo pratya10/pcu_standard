@@ -71,7 +71,7 @@ export type TopicEvidenceItem = {
 export type TopicScoreItem = {
   id: string
   topic_id: string
-  score_level: -1 | 0 | 1 | 2
+  score_level: -2 | -1 | 0 | 1 | 2
   item_text: string
   sort_order: number
 }
@@ -93,6 +93,8 @@ export type ItemNote = {
   comment: string
 }
 
+export type ScoringMode = 'average' | 'collaborative'
+
 export type AssessmentRound = {
   id: string
   facility_id: string
@@ -102,6 +104,7 @@ export type AssessmentRound = {
   join_code: string
   status: 'draft' | 'in_progress' | 'completed'
   is_public: boolean
+  scoring_mode: ScoringMode
   created_by: string | null
   created_at: string
   completed_at: string | null
@@ -161,6 +164,33 @@ export type Score = {
   evidence_checked: string[]
   item_notes: Record<string, ItemNote>
   updated_at: string
+}
+
+export type TeamScore = {
+  id: string
+  round_id: string
+  topic_id: string
+  score: ScoreValue | null
+  is_na: boolean
+  must_pass: boolean | null
+  comment: string | null
+  item_notes: Record<string, ItemNote>
+  updated_by: string | null
+  updated_at: string
+}
+
+export type TeamScoreAuditField = 'score' | 'must_pass' | 'item_checked'
+
+export type TeamScoreAudit = {
+  id: string
+  round_id: string
+  topic_id: string
+  item_id: string | null
+  field: TeamScoreAuditField
+  participant_id: string | null
+  old_value: unknown
+  new_value: unknown
+  created_at: string
 }
 
 export type FullStandard = {
