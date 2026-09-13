@@ -2,7 +2,7 @@
 
 เว็บแอปสำหรับให้คณะกรรมการร่วมกันประเมินหน่วยบริการปฐมภูมิ (รพ.สต./ศสม.) ตาม **มาตรฐานหน่วยบริการปฐมภูมิ ฉบับก้าวหน้า ปี 2571–2573** ผ่านมือถือ เห็นคะแนนสรุปแบบ real-time ระหว่างการประเมิน และ export รายงานเมื่อประเมินเสร็จ
 
-- Frontend: React + Vite + TypeScript + Tailwind (SPA, มือถือก่อน) → deploy บน Cloudflare Pages
+- Frontend: React + Vite + TypeScript + Tailwind (SPA, มือถือก่อน) → deploy บน Cloudflare Workers ที่ path `mshprimary.com/pcustandard71`
 - Backend: Supabase (Postgres + Auth + Realtime)
 
 ## 1) ตั้งค่า Supabase
@@ -36,23 +36,27 @@ npm run dev
 - `/round/:id/live` — จอสรุปคะแนนแบบ real-time (เปิดฉายระหว่างประชุมกรรมการได้)
 - `/round/:id/report` — รายงานสรุปผล พร้อมปุ่ม Export CSV และพิมพ์เป็น PDF
 
-## 3) Deploy ขึ้น Cloudflare Pages
+## 3) Deploy ขึ้น Cloudflare (Workers, path-based)
 
-วิธีที่แนะนำ (auto-deploy ทุกครั้งที่ push ขึ้น GitHub):
+แอปนี้ deploy เป็น **Cloudflare Worker (static assets)** แทน Pages เพราะต้องขึ้นที่ path ย่อยของโดเมนที่มีอยู่แล้ว (`mshprimary.com/pcustandard71`) ซึ่ง Pages custom domain ทำแบบ path ไม่ได้ — ต้องใช้ Workers Route แทน
 
-1. Push โค้ดขึ้น `git@github.com:pratya10/pcu_standard.git`
-2. ใน Cloudflare Dashboard → Workers & Pages → **Create → Pages → Connect to Git** เลือก repo นี้
-3. ตั้งค่า Build:
-   - Build command: `npm run build`
-   - Build output directory: `dist`
-4. เพิ่ม Environment variables (Production & Preview): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
-5. Deploy — ไฟล์ `public/_redirects` ทำให้ client-side routing (React Router) ทำงานถูกต้องบน Cloudflare Pages
+การตั้งค่าทำไว้ให้แล้วใน:
 
-หรือ deploy จากเครื่องโดยตรงด้วย Wrangler CLI:
+- `vite.config.ts` — `base: '/pcustandard71/'` และ build ออกไปที่ `dist/pcustandard71/`
+- `src/App.tsx` — `<BrowserRouter basename="/pcustandard71">`
+- `wrangler.jsonc` — ประกาศ route `mshprimary.com/pcustandard71*` และ `not_found_handling: "single-page-application"` สำหรับ client-side routing
+- `package.json` → `npm run build` จะคัดลอก `index.html` ไว้ที่ root ของ `dist/` เพิ่มอีกชุด (จำเป็นสำหรับ SPA fallback ของ Cloudflare)
+
+ขั้นตอน deploy:
 
 ```bash
-npm run deploy
+npx wrangler login   # ครั้งแรกครั้งเดียว เปิดเบราว์เซอร์ให้ authorize บัญชี Cloudflare
+npm run deploy       # build + wrangler deploy
 ```
+
+เนื่องจากเป็นการ build แล้ว deploy จากเครื่อง (ไม่ใช่ CI ของ Cloudflare) ค่าใน `.env` ตอนรัน `npm run deploy` จะถูกฝังเข้าไปในไฟล์ JS ที่ deploy โดยตรง — ไม่ต้องตั้งค่า Environment variables แยกในหน้า Cloudflare Dashboard
+
+หากต้องการเปลี่ยน path หรือโดเมน แก้ที่ `vite.config.ts` (`base`), `src/App.tsx` (`basename`) และ `wrangler.jsonc` (`routes[0].pattern`, `zone_name`) ให้ตรงกันทั้ง 3 จุด แล้ว deploy ใหม่
 
 ## โครงสร้างคะแนน
 
