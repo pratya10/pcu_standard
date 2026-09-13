@@ -2,10 +2,11 @@ import { createContext, useCallback, useContext, useRef, useState, type ReactNod
 
 type ConfirmOptions = {
   title?: string
-  message: string
+  message: ReactNode
   confirmLabel?: string
   cancelLabel?: string
   danger?: boolean
+  wide?: boolean
 }
 
 type ConfirmFn = (options: ConfirmOptions | string) => Promise<boolean>
@@ -40,9 +41,12 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
       {children}
       {options && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4" onClick={() => close(false)}>
-          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div
+            className={`w-full ${options.wide ? 'max-w-lg' : 'max-w-sm'} rounded-2xl bg-white p-5 shadow-xl`}
+            onClick={(e) => e.stopPropagation()}
+          >
             {options.title && <h2 className="mb-2 font-bold text-slate-800">{options.title}</h2>}
-            <p className="mb-5 text-sm text-slate-600 whitespace-pre-line">{options.message}</p>
+            <div className="mb-5 text-sm whitespace-pre-line text-slate-600">{options.message}</div>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => close(false)}

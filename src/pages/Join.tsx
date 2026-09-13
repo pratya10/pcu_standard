@@ -1,11 +1,24 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { randomDeviceKey, saveParticipantSession } from '../lib/participantSession'
-import type { ParticipantRole } from '../types'
+import { searchCommitteeMembers, updateCommitteeMember } from '../lib/committeeSearch'
+import { useConfirm } from '../components/ConfirmProvider'
+import type { CommitteeMember, ParticipantRole } from '../types'
+
+function DiffRow({ label, oldValue, newValue }: { label: string; oldValue: string; newValue: string }) {
+  return (
+    <div className="mb-4">
+      <p className="mb-1 text-base font-semibold text-slate-700">{label}</p>
+      <p className="text-lg text-red-600 line-through">{oldValue || '(ว่าง)'}</p>
+      <p className="text-lg font-bold text-emerald-700">→ {newValue || '(ว่าง)'}</p>
+    </div>
+  )
+}
 
 export default function Join() {
   const navigate = useNavigate()
+  const confirm = useConfirm()
   const [joinCode, setJoinCode] = useState('')
   const [name, setName] = useState('')
   const [civilServiceLevel, setCivilServiceLevel] = useState('')
@@ -13,6 +26,40 @@ export default function Join() {
   const [role, setRole] = useState<ParticipantRole>('evaluator')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [suggestions, setSuggestions] = useState<CommitteeMember[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [selectedMember, setSelectedMember] = useState<CommitteeMember | null>(null)
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function handleNameChange(value: string) {
+    setName(value)
+    if (selectedMember && value.trim() !== selectedMember.name) setSelectedMember(null)
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    const query = value.trim()
+    if (query.length < 3) {
+      setSuggestions([])
+      return
+    }
+    searchTimer.current = setTimeout(async () => {
+      try {
+        const results = await searchCommitteeMembers(query)
+        setSuggestions(results)
+        setShowSuggestions(true)
+      } catch (err) {
+        console.error(err)
+      }
+    }, 300)
+  }
+
+  function selectSuggestion(m: CommitteeMember) {
+    setName(m.name)
+    setCivilServiceLevel(m.civil_service_level ?? '')
+    setAffiliation(m.affiliation ?? '')
+    setSelectedMember(m)
+    setSuggestions([])
+    setShowSuggestions(false)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -31,11 +78,47 @@ export default function Join() {
       if (roundErr) throw roundErr
       if (!round) {
         setError('ไม่พบรอบการประเมินสำหรับรหัสนี้ กรุณาตรวจสอบอีกครั้ง')
+        setLoading(false)
         return
       }
       if (round.status === 'completed' && role !== 'viewer') {
         setError('รอบการประเมินนี้ปิดรับคะแนนแล้ว สามารถเข้าดูผลได้ในโหมดผู้สังเกตการณ์')
+        setLoading(false)
         return
+      }
+
+      // If the typed details now differ from a previously selected registry
+      // entry, ask whether to update that master record too.
+      if (selectedMember && role === 'evaluator') {
+        const oldLevel = selectedMember.civil_service_level ?? ''
+        const oldAffil = selectedMember.affiliation ?? ''
+        const newLevel = civilServiceLevel.trim()
+        const newAffil = affiliation.trim()
+        const nameChanged = name.trim() !== selectedMember.name
+        const levelChanged = newLevel !== oldLevel
+        const affilChanged = newAffil !== oldAffil
+        if (nameChanged || levelChanged || affilChanged) {
+          const shouldUpdate = await confirm({
+            title: 'ข้อมูลแตกต่างจากที่มีอยู่ในทะเบียน',
+            wide: true,
+            confirmLabel: 'อัปเดตข้อมูลเดิมด้วย',
+            cancelLabel: 'ไม่อัปเดต ใช้ครั้งนี้อย่างเดียว',
+            message: (
+              <div>
+                {nameChanged && <DiffRow label="ชื่อ-สกุล" oldValue={selectedMember.name} newValue={name.trim()} />}
+                {levelChanged && <DiffRow label="ระดับข้าราชการ / ตำแหน่ง" oldValue={oldLevel} newValue={newLevel} />}
+                {affilChanged && <DiffRow label="หน่วยงานที่สังกัด" oldValue={oldAffil} newValue={newAffil} />}
+              </div>
+            ),
+          })
+          if (shouldUpdate) {
+            await updateCommitteeMember(selectedMember.id, {
+              name: name.trim(),
+              civil_service_level: newLevel || null,
+              affiliation: newAffil || null,
+            })
+          }
+        }
       }
 
       const deviceKey = randomDeviceKey()
@@ -66,80 +149,105 @@ export default function Join() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
-      <h1 className="mb-6 text-center text-xl font-bold text-slate-800">เข้าร่วมรอบการประเมิน</h1>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <h1 className="mb-6 text-center text-2xl font-bold text-slate-800">เข้าร่วมรอบการประเมิน</h1>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">รหัสเข้าร่วม (Join Code)</label>
+          <label className="mb-1 block text-lg font-semibold text-slate-700">รหัสเข้าร่วม (Join Code)</label>
           <input
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
             placeholder="เช่น A7K3ZQ"
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-center text-2xl font-mono tracking-widest uppercase"
+            className="w-full rounded-xl border border-slate-300 px-4 py-4 text-center text-3xl font-mono tracking-widest uppercase"
             maxLength={8}
             autoFocus
           />
         </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">ชื่อ-สกุล</label>
+        <div className="relative">
+          <label className="mb-1 block text-lg font-semibold text-slate-700">ชื่อ-สกุล</label>
           <input
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => handleNameChange(e.target.value)}
+            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             placeholder="ชื่อ-สกุลผู้ประเมิน"
-            className="w-full rounded-xl border border-slate-300 px-4 py-3"
+            className="w-full rounded-xl border border-slate-300 px-4 py-4 text-lg"
+            autoComplete="off"
           />
+          {selectedMember && (
+            <p className="mt-1 text-base text-emerald-700">✓ พบในทะเบียน — เติมข้อมูลให้อัตโนมัติแล้ว</p>
+          )}
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg">
+              {suggestions.map((m) => (
+                <button
+                  type="button"
+                  key={m.id}
+                  onMouseDown={() => selectSuggestion(m)}
+                  className="block w-full border-b border-slate-100 px-4 py-3 text-left text-lg last:border-0 hover:bg-emerald-50"
+                >
+                  <span className="font-semibold text-slate-800">{m.name}</span>
+                  {(m.position || m.affiliation) && (
+                    <span className="block text-base text-slate-500">
+                      {[m.position, m.affiliation].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         {role === 'evaluator' && (
           <>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-600">
-                ระดับข้าราชการ / ตำแหน่ง <span className="text-slate-400">(ไม่บังคับ)</span>
+              <label className="mb-1 block text-lg font-semibold text-slate-700">
+                ระดับข้าราชการ / ตำแหน่ง <span className="text-base font-normal text-slate-400">(ไม่บังคับ)</span>
               </label>
               <input
                 value={civilServiceLevel}
                 onChange={(e) => setCivilServiceLevel(e.target.value)}
                 placeholder="เช่น ชำนาญการพิเศษ"
-                className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                className="w-full rounded-xl border border-slate-300 px-4 py-4 text-lg"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-600">
-                หน่วยงานที่สังกัด <span className="text-slate-400">(ไม่บังคับ)</span>
+              <label className="mb-1 block text-lg font-semibold text-slate-700">
+                หน่วยงานที่สังกัด <span className="text-base font-normal text-slate-400">(ไม่บังคับ)</span>
               </label>
               <input
                 value={affiliation}
                 onChange={(e) => setAffiliation(e.target.value)}
                 placeholder="เช่น สสจ.เชียงราย"
-                className="w-full rounded-xl border border-slate-300 px-4 py-3"
+                className="w-full rounded-xl border border-slate-300 px-4 py-4 text-lg"
               />
             </div>
           </>
         )}
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-600">บทบาท</label>
+          <label className="mb-1 block text-lg font-semibold text-slate-700">บทบาท</label>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => setRole('evaluator')}
-              className={`rounded-xl border px-4 py-3 text-sm font-medium ${role === 'evaluator' ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-300 text-slate-500'}`}
+              className={`rounded-xl border px-4 py-4 text-lg font-medium ${role === 'evaluator' ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-300 text-slate-500'}`}
             >
               กรรมการประเมิน
             </button>
             <button
               type="button"
               onClick={() => setRole('viewer')}
-              className={`rounded-xl border px-4 py-3 text-sm font-medium ${role === 'viewer' ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-300 text-slate-500'}`}
+              className={`rounded-xl border px-4 py-4 text-lg font-medium ${role === 'viewer' ? 'border-emerald-600 bg-emerald-50 text-emerald-700' : 'border-slate-300 text-slate-500'}`}
             >
               ผู้สังเกตการณ์
             </button>
           </div>
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-lg text-red-600">{error}</p>}
 
         <button
           type="submit"
           disabled={loading}
-          className="mt-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white disabled:opacity-50"
+          className="mt-2 rounded-xl bg-emerald-600 px-4 py-4 text-xl font-semibold text-white disabled:opacity-50"
         >
           {loading ? 'กำลังเข้าร่วม...' : 'เข้าร่วม'}
         </button>
