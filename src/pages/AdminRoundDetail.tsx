@@ -209,14 +209,24 @@ export default function AdminRoundDetail() {
           </div>
 
           <p className="mt-3 text-sm text-slate-500">การเผยแพร่สู่สาธารณะ</p>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={togglePublic}
               disabled={updating || round.status !== 'completed'}
               className={`rounded-lg border px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40 ${round.is_public ? 'border-sky-600 bg-sky-50 text-sky-700' : 'border-slate-300 text-slate-500'}`}
             >
-              {round.is_public ? '✓ เผยแพร่อยู่ (คนทั่วไปดูได้ที่หน้า "ประวัติการประเมิน")' : 'ยังไม่เผยแพร่'}
+              {round.is_public ? '✓ เปิดสู่สาธารณะแล้ว' : 'เปิดสู่สาธารณะ'}
             </button>
+            {round.is_public && (
+              <Link
+                to={`/round/${roundId}/report`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm text-sky-700 underline"
+              >
+                ลิงก์รายงาน →
+              </Link>
+            )}
           </div>
           {round.status !== 'completed' && (
             <p className="mt-1 text-xs text-slate-400">ต้องปิดรับคะแนน (เสร็จสิ้น) ก่อน จึงจะเผยแพร่ผลสู่สาธารณะได้</p>
