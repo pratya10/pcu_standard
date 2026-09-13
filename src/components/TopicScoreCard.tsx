@@ -431,7 +431,7 @@ function ToggleSwitch({ checked, disabled, onChange }: { checked: boolean; disab
         checked ? 'bg-emerald-500' : 'bg-red-400'
       } disabled:opacity-60`}
     >
-      {checked ? 'มี' : 'ไม่มี'}
+      {checked ? 'ใช่' : 'ไม่ใช่'}
     </button>
   )
 }

@@ -46,9 +46,28 @@ export default function ScoreForm() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [navOpen, setNavOpen] = useState(false)
   const [online, setOnline] = useState<PresenceInfo[]>([])
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const session = roundId ? getParticipantSession(roundId) : null
   const collaborative = round?.scoring_mode === 'collaborative'
+
+  useEffect(() => {
+    // Someone can be an app admin (logged in via Google separately) *and*
+    // also joined this round as a regular participant on the same device —
+    // this lets admins delete any comment while everyone else can only
+    // edit their own.
+    let cancelled = false
+    async function checkAdmin() {
+      const { data } = await supabase.auth.getSession()
+      if (!data.session) return
+      const { data: isAdminResult } = await supabase.rpc('is_admin')
+      if (!cancelled) setIsAdmin(!!isAdminResult)
+    }
+    checkAdmin()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (!roundId) return
@@ -516,6 +535,7 @@ export default function ScoreForm() {
                       participantName={session.name}
                       participantNameById={participantNameById}
                       accentColor={s.color}
+                      isAdmin={isAdmin}
                       onSaved={handleTeamSaved}
                     />
                   ) : (

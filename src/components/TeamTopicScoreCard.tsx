@@ -46,6 +46,7 @@ export default function TeamTopicScoreCard({
   participantName,
   participantNameById,
   accentColor,
+  isAdmin,
   onSaved,
 }: {
   topic: TopicWithEvidence
@@ -56,6 +57,7 @@ export default function TeamTopicScoreCard({
   participantName: string
   participantNameById: Map<string, string>
   accentColor?: string
+  isAdmin?: boolean
   onSaved: (updated: TeamScore) => void
 }) {
   const confirm = useConfirm()
@@ -164,7 +166,7 @@ export default function TeamTopicScoreCard({
     if (current && current.checked !== checked) {
       const ok = await confirm({
         title: 'ยืนยันเปลี่ยนค่า',
-        message: `ข้อนี้ถูกตั้งไว้แล้วว่า "${current.checked ? 'มี' : 'ไม่มี'}" โดย ${editorName(current.checkedBy)}\nต้องการเปลี่ยนเป็น "${checked ? 'มี' : 'ไม่มี'}" หรือไม่?`,
+        message: `ข้อนี้ถูกตั้งไว้แล้วว่า "${current.checked ? 'ใช่' : 'ไม่ใช่'}" โดย ${editorName(current.checkedBy)}\nต้องการเปลี่ยนเป็น "${checked ? 'ใช่' : 'ไม่ใช่'}" หรือไม่?`,
         confirmLabel: 'ยืนยันเปลี่ยน',
       })
       if (!ok) return
@@ -207,6 +209,16 @@ export default function TeamTopicScoreCard({
     setEditingItemCommentId((prev) => ({ ...prev, [itemId]: null }))
   }
 
+  async function deleteItemComment(itemId: string, commentId: string) {
+    const ok = await confirm({ title: 'ลบคอมเมนต์', message: 'ลบคอมเมนต์นี้ออก? การลบไม่สามารถย้อนกลับได้', confirmLabel: 'ลบ' })
+    if (!ok) return
+    const current = itemNotes[itemId]
+    const nextComments = getNoteComments(current).filter((c) => c.id !== commentId)
+    const next = { ...itemNotes, [itemId]: { checked: current?.checked ?? false, checkedBy: current?.checkedBy, comments: nextComments } }
+    if (editingItemCommentId[itemId] === commentId) cancelEditItemComment(itemId)
+    await persist({ itemNotes: next })
+  }
+
   async function submitTopicComment() {
     const text = newTopicComment.trim()
     if (!text) return
@@ -226,6 +238,14 @@ export default function TeamTopicScoreCard({
   function cancelEditTopicComment() {
     setNewTopicComment('')
     setEditingTopicCommentId(null)
+  }
+
+  async function deleteTopicComment(commentId: string) {
+    const ok = await confirm({ title: 'ลบคอมเมนต์', message: 'ลบคอมเมนต์นี้ออก? การลบไม่สามารถย้อนกลับได้', confirmLabel: 'ลบ' })
+    if (!ok) return
+    const nextComments = topicComments.filter((c) => c.id !== commentId)
+    if (editingTopicCommentId === commentId) cancelEditTopicComment()
+    await persist({ comment: serializeTeamComments(nextComments) })
   }
 
   async function handlePhotoChange(itemId: string, e: React.ChangeEvent<HTMLInputElement>) {
@@ -310,21 +330,32 @@ export default function TeamTopicScoreCard({
                       {noteComments.map((c) => (
                         <div key={c.id} className="rounded-md bg-white p-1.5 text-xs text-slate-600">
                           <p className="whitespace-pre-line">{c.text}</p>
-                          {c.author && (
+                          {(c.author || isAdmin) && (
                             <p className="mt-0.5 flex items-center justify-between gap-2 text-[10px] text-slate-400">
                               <span>
                                 {c.author}
                                 {c.createdAt && ` · ${formatEntryTime(c.createdAt)}`}
                               </span>
-                              {!readOnly && c.authorId === participantId && (
-                                <button
-                                  type="button"
-                                  onClick={() => startEditItemComment(item.id, c)}
-                                  className="font-medium text-emerald-600 hover:underline"
-                                >
-                                  แก้ไข
-                                </button>
-                              )}
+                              <span className="flex shrink-0 gap-2">
+                                {!readOnly && c.authorId === participantId && (
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditItemComment(item.id, c)}
+                                    className="font-medium text-emerald-600 hover:underline"
+                                  >
+                                    แก้ไข
+                                  </button>
+                                )}
+                                {isAdmin && (
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteItemComment(item.id, c.id)}
+                                    className="font-medium text-red-600 hover:underline"
+                                  >
+                                    ลบ
+                                  </button>
+                                )}
+                              </span>
                             </p>
                           )}
                         </div>
@@ -430,7 +461,7 @@ export default function TeamTopicScoreCard({
             )}
             {teamScore?.updated_by && (
               <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
-                แก้ล่าสุดโดย {editorName(teamScore.updated_by)}
+                โดย {editorName(teamScore.updated_by)} {formatEntryTime(teamScore.updated_at)}
               </span>
             )}
           </div>
@@ -492,59 +523,63 @@ export default function TeamTopicScoreCard({
             <p className="mb-1 truncate text-[10px] font-medium text-slate-400">
               {topic.code} · {topic.name_th}
             </p>
-            {topic.must_text && (
-              <div className="mb-2">
-                <p className="mb-1 text-base font-bold text-slate-800">ผลการประเมิน The Must</p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={readOnly}
-                    onClick={() => applyMustPass(false)}
-                    className={`flex-1 rounded-2xl border-2 py-[0.675rem] text-base font-bold ${mustPass === false ? 'border-red-600 bg-red-500 text-white' : 'border-slate-300 text-slate-500'}`}
-                  >
-                    ✗ ไม่ผ่าน
-                  </button>
-                  <button
-                    type="button"
-                    disabled={readOnly}
-                    onClick={() => applyMustPass(true)}
-                    className={`flex-1 rounded-2xl border-2 py-[0.675rem] text-base font-bold ${mustPass === true ? 'border-emerald-600 bg-emerald-500 text-white' : 'border-slate-300 text-slate-500'}`}
-                  >
-                    ✓ ผ่าน
-                  </button>
+            <div className="flex gap-3">
+              {topic.must_text && (
+                <div className="flex-1">
+                  <p className="mb-1 text-[11px] font-bold text-slate-600">The Must</p>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      disabled={readOnly}
+                      onClick={() => applyMustPass(false)}
+                      className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold ${mustPass === false ? 'border-red-600 bg-red-500 text-white' : 'border-slate-300 text-slate-500'}`}
+                    >
+                      ✗ ไม่ผ่าน
+                    </button>
+                    <button
+                      type="button"
+                      disabled={readOnly}
+                      onClick={() => applyMustPass(true)}
+                      className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold ${mustPass === true ? 'border-emerald-600 bg-emerald-500 text-white' : 'border-slate-300 text-slate-500'}`}
+                    >
+                      ✓ ผ่าน
+                    </button>
+                  </div>
+                  {teamScore?.must_pass_updated_by && mustPass !== null && (
+                    <p className="mt-1 truncate text-[10px] text-slate-400">แก้ล่าสุดโดย {editorName(teamScore.must_pass_updated_by)}</p>
+                  )}
                 </div>
-                {teamScore?.must_pass_updated_by && mustPass !== null && (
-                  <p className="mt-1 text-[11px] text-slate-400">แก้ล่าสุดโดย {editorName(teamScore.must_pass_updated_by)}</p>
-                )}
-              </div>
-            )}
+              )}
 
-            <div>
-              <p className="mb-1 text-base font-bold text-slate-800">คะแนน Continuous Improvement</p>
-              <div className={`grid gap-2 ${topic.allow_na ? 'grid-cols-4' : 'grid-cols-3'}`}>
-                {([0, 1, 2] as ScoreValue[]).map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    disabled={readOnly}
-                    onClick={() => applyScore(v)}
-                    className={`rounded-2xl border-2 py-[0.675rem] text-lg font-bold ${!isNa && score === v ? SCORE_COLOR[v] : 'border-slate-300 text-slate-500'}`}
-                  >
-                    {v}
-                  </button>
-                ))}
-                {topic.allow_na && (
-                  <button
-                    type="button"
-                    disabled={readOnly}
-                    onClick={applyNa}
-                    className={`rounded-2xl border-2 py-[0.675rem] text-lg font-bold ${isNa ? 'border-sky-600 bg-sky-500 text-white' : 'border-slate-300 text-slate-500'}`}
-                  >
-                    N/A
-                  </button>
+              <div className={topic.must_text ? 'flex-[1.5]' : 'flex-1'}>
+                <p className="mb-1 text-[11px] font-bold text-slate-600">CI Score</p>
+                <div className={`grid gap-1.5 ${topic.allow_na ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                  {([0, 1, 2] as ScoreValue[]).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      disabled={readOnly}
+                      onClick={() => applyScore(v)}
+                      className={`rounded-xl border-2 py-2 text-sm font-bold ${!isNa && score === v ? SCORE_COLOR[v] : 'border-slate-300 text-slate-500'}`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                  {topic.allow_na && (
+                    <button
+                      type="button"
+                      disabled={readOnly}
+                      onClick={applyNa}
+                      className={`rounded-xl border-2 py-2 text-xs font-bold ${isNa ? 'border-sky-600 bg-sky-500 text-white' : 'border-slate-300 text-slate-500'}`}
+                    >
+                      N/A
+                    </button>
+                  )}
+                </div>
+                {teamScore?.updated_by && answered && (
+                  <p className="mt-1 truncate text-[10px] text-slate-400">แก้ล่าสุดโดย {editorName(teamScore.updated_by)}</p>
                 )}
               </div>
-              {teamScore?.updated_by && answered && <p className="mt-1 text-[11px] text-slate-400">แก้ล่าสุดโดย {editorName(teamScore.updated_by)}</p>}
             </div>
           </div>
 
@@ -555,17 +590,24 @@ export default function TeamTopicScoreCard({
                 {topicComments.map((c) => (
                   <div key={c.id} className="rounded-lg bg-slate-50 p-2 text-sm text-slate-600">
                     <p className="whitespace-pre-line">{c.text}</p>
-                    {c.author && (
+                    {(c.author || isAdmin) && (
                       <p className="mt-0.5 flex items-center justify-between gap-2 text-xs text-slate-400">
                         <span>
                           {c.author}
                           {c.createdAt && ` · ${formatEntryTime(c.createdAt)}`}
                         </span>
-                        {!readOnly && c.authorId === participantId && (
-                          <button type="button" onClick={() => startEditTopicComment(c)} className="font-medium text-emerald-600 hover:underline">
-                            แก้ไข
-                          </button>
-                        )}
+                        <span className="flex shrink-0 gap-2">
+                          {!readOnly && c.authorId === participantId && (
+                            <button type="button" onClick={() => startEditTopicComment(c)} className="font-medium text-emerald-600 hover:underline">
+                              แก้ไข
+                            </button>
+                          )}
+                          {isAdmin && (
+                            <button type="button" onClick={() => deleteTopicComment(c.id)} className="font-medium text-red-600 hover:underline">
+                              ลบ
+                            </button>
+                          )}
+                        </span>
                       </p>
                     )}
                   </div>
@@ -626,7 +668,7 @@ function ToggleSwitch({ checked, disabled, onChange }: { checked: boolean; disab
         checked ? 'bg-emerald-500' : 'bg-red-400'
       } disabled:opacity-60`}
     >
-      {checked ? 'มี' : 'ไม่มี'}
+      {checked ? 'ใช่' : 'ไม่ใช่'}
     </button>
   )
 }
