@@ -526,7 +526,7 @@ export default function TeamTopicScoreCard({
             <div className="flex gap-3">
               {topic.must_text && (
                 <div className="flex-1">
-                  <p className="mb-1 text-[11px] font-bold text-slate-600">The Must</p>
+                  <p className="mb-1 text-[11px] font-bold text-slate-600">มาตรฐานพื้นฐาน</p>
                   <div className="flex gap-1.5">
                     <button
                       type="button"
@@ -552,7 +552,7 @@ export default function TeamTopicScoreCard({
               )}
 
               <div className={topic.must_text ? 'flex-[1.5]' : 'flex-1'}>
-                <p className="mb-1 text-[11px] font-bold text-slate-600">CI Score</p>
+                <p className="mb-1 text-[11px] font-bold text-slate-600">เกณฑ์การพัฒนาต่อเนื่อง</p>
                 <div className={`grid gap-1.5 ${topic.allow_na ? 'grid-cols-4' : 'grid-cols-3'}`}>
                   {([0, 1, 2] as ScoreValue[]).map((v) => (
                     <button
