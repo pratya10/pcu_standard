@@ -12,21 +12,61 @@ import { downloadBlob, generateReportDocx } from '../lib/docxExport'
 import { formatThaiDate } from '../lib/thaiDate'
 import { getTopicPhotoUrl, groupPhotosByTopicAndItem, listRoundPhotos } from '../lib/topicPhotos'
 
-// "ความคิดเห็นที่ N : ... โดย ..." — one evaluator's comment per line, numbered
-// within its own group (a topic's general comments and each sub-item's
-// comments are numbered separately), with no extra status text.
-function buildCommentLines(scores: Score[] | undefined, evaluatorNameById: Map<string, string>, pick: (s: Score) => string | null | undefined): string[] {
+type CommentEntry = { text: string; author: string }
+
+// One evaluator's comment per entry — rendered as "ความคิดเห็น : {text} โดย
+// {author}" with the text itself made prominent and the author faint, no
+// numbering and no timestamp.
+function buildCommentEntries(scores: Score[] | undefined, evaluatorNameById: Map<string, string>, pick: (s: Score) => string | null | undefined): CommentEntry[] {
   if (!scores) return []
-  const lines: string[] = []
-  let n = 0
+  const entries: CommentEntry[] = []
   for (const s of scores) {
     const comment = pick(s)
     if (!comment) continue
-    n++
-    const name = evaluatorNameById.get(s.participant_id) ?? 'กรรมการ'
-    lines.push(`ความคิดเห็นที่ ${n} : ${comment} โดย ${name}`)
+    entries.push({ text: comment, author: evaluatorNameById.get(s.participant_id) ?? 'กรรมการ' })
   }
-  return lines
+  return entries
+}
+
+type ItemEntry = { checked: boolean; text: string | null; author: string }
+
+// Like buildCommentEntries, but also carries the ใช่/ไม่ checked state each
+// evaluator left on this specific sub-item (present whenever they've
+// touched the item at all, whether or not they also left a comment).
+function buildItemEntries(scores: Score[] | undefined, evaluatorNameById: Map<string, string>, itemId: string): ItemEntry[] {
+  if (!scores) return []
+  const entries: ItemEntry[] = []
+  for (const s of scores) {
+    const note = s.item_notes?.[itemId]
+    if (!note) continue
+    entries.push({ checked: note.checked, text: note.comment || null, author: evaluatorNameById.get(s.participant_id) ?? 'กรรมการ' })
+  }
+  return entries
+}
+
+// Mirrors the score-form's own grouping (The Must, then the 0/1/2 score
+// boxes, then supporting evidence at the end) so the report's indentation
+// matches the structure evaluators actually saw while scoring.
+const ITEM_LEVEL_ORDER = [-1, 0, 1, 2, -2] as const
+const ITEM_LEVEL_LABEL: Record<(typeof ITEM_LEVEL_ORDER)[number], string> = {
+  [-1]: 'เกณฑ์มาตรฐานพื้นฐาน (The Must)',
+  0: '0 คะแนน',
+  1: '1 คะแนน',
+  2: '2 คะแนน',
+  [-2]: 'หลักฐานประกอบการประเมิน',
+}
+
+// "ความคิดเห็น : {text} โดย {author}" — the comment text itself is the
+// prominent part; the author is a faint attribution with no timestamp.
+function CommentLine({ entry, inline }: { entry: CommentEntry; inline?: boolean }) {
+  const content = (
+    <>
+      <span className="text-slate-400">ความคิดเห็น : </span>
+      <span className="whitespace-pre-line font-semibold text-slate-800">{entry.text}</span>{' '}
+      <span className="text-slate-400">โดย {entry.author}</span>
+    </>
+  )
+  return inline ? content : <p>{content}</p>
 }
 
 export default function Report() {
@@ -253,6 +293,12 @@ export default function Report() {
         <div className="rounded-xl border border-slate-200 p-3">
           <p className="mb-2 text-xs font-semibold text-slate-400">แบบละเอียด (มี comment + รูป)</p>
           <div className="flex gap-2">
+            <button
+              onClick={() => setPrintMode((m) => (m === 'detailed' ? 'summary' : 'detailed'))}
+              className={`rounded-lg px-3 py-2 text-sm font-medium ${printMode === 'detailed' ? 'bg-emerald-600 text-white' : 'border border-slate-300 text-slate-600'}`}
+            >
+              {printMode === 'detailed' ? 'กำลังดูในหน้าเว็บ' : 'ดูในหน้าเว็บ'}
+            </button>
             <button onClick={printDetailed} className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white">
               PDF
             </button>
@@ -330,17 +376,21 @@ export default function Report() {
                 <tbody>
                   {catTopics.map((t) => {
                     const agg = aggregates.get(t.id)
-                    const generalLines = compact ? [] : buildCommentLines(agg?.scores, evaluatorNameById, (s) => s.comment)
-                    const itemBlocks = compact
+                    const generalEntries = compact ? [] : buildCommentEntries(agg?.scores, evaluatorNameById, (s) => s.comment)
+                    const levelGroups = compact
                       ? []
-                      : t.scoreItems
-                          .map((item) => ({
-                            item,
-                            lines: buildCommentLines(agg?.scores, evaluatorNameById, (s) => s.item_notes?.[item.id]?.comment),
-                            itemPhotos: photosByTopicAndItem.get(t.id)?.get(item.id) ?? [],
-                          }))
-                          .filter((b) => b.lines.length > 0 || b.itemPhotos.length > 0)
-                    const hasDetail = generalLines.length > 0 || itemBlocks.length > 0
+                      : ITEM_LEVEL_ORDER.map((level) => ({
+                          level,
+                          items: t.scoreItems
+                            .filter((item) => item.score_level === level)
+                            .map((item) => ({
+                              item,
+                              entries: buildItemEntries(agg?.scores, evaluatorNameById, item.id),
+                              itemPhotos: photosByTopicAndItem.get(t.id)?.get(item.id) ?? [],
+                            }))
+                            .filter((b) => b.entries.length > 0 || b.itemPhotos.length > 0),
+                        })).filter((g) => g.items.length > 0)
+                    const hasDetail = generalEntries.length > 0 || levelGroups.length > 0
                     return (
                       <Fragment key={t.id}>
                         <tr className="border-b border-slate-100">
@@ -356,35 +406,51 @@ export default function Report() {
                         {hasDetail && (
                           <tr className="break-inside-avoid border-b border-slate-100">
                             <td colSpan={3} className="bg-slate-50 px-3 py-2 align-top text-xs text-slate-600 print:text-[11px]">
-                              {generalLines.length > 0 && (
-                                <ul className="mb-1.5 list-none space-y-0.5 pl-0 last:mb-0">
-                                  {generalLines.map((line, i) => (
-                                    <li key={i}>{line}</li>
+                              {generalEntries.length > 0 && (
+                                <div className="mb-1.5 space-y-0.5 last:mb-0">
+                                  {generalEntries.map((e, i) => (
+                                    <CommentLine key={i} entry={e} />
                                   ))}
-                                </ul>
+                                </div>
                               )}
-                              {itemBlocks.map(({ item, lines, itemPhotos }) => (
-                                <div key={item.id} className="mt-1.5 border-l-2 border-slate-200 pl-2 first:mt-0">
-                                  <p className="font-medium text-slate-700">{item.item_text}</p>
-                                  {lines.length > 0 && (
-                                    <ul className="list-none space-y-0.5 pl-0">
-                                      {lines.map((line, i) => (
-                                        <li key={i}>{line}</li>
-                                      ))}
-                                    </ul>
-                                  )}
-                                  {itemPhotos.length > 0 && (
-                                    <div className="mt-1 flex flex-wrap gap-2">
-                                      {itemPhotos.map((p) => (
-                                        <img
-                                          key={p.id}
-                                          src={getTopicPhotoUrl(p.file_path)}
-                                          alt={p.file_name ?? ''}
-                                          className="h-20 w-20 rounded-md border border-slate-200 object-cover"
-                                        />
-                                      ))}
-                                    </div>
-                                  )}
+                              {levelGroups.map(({ level, items }) => (
+                                <div key={level} className="mt-1.5 first:mt-0">
+                                  <p className="text-[11px] font-semibold text-slate-500">{ITEM_LEVEL_LABEL[level]}</p>
+                                  <div className="ml-1 space-y-1.5 border-l-2 border-slate-200 pl-2 pt-1">
+                                    {items.map(({ item, entries, itemPhotos }) => (
+                                      <div key={item.id}>
+                                        <p className="font-medium text-slate-700">{item.item_text}</p>
+                                        {entries.length > 0 && (
+                                          <div className="space-y-0.5">
+                                            {entries.map((e, i) => (
+                                              <p key={i}>
+                                                <span className={`mr-1 font-semibold ${e.checked ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                  {e.checked ? 'ใช่' : 'ไม่'}
+                                                </span>
+                                                {e.text ? (
+                                                  <CommentLine entry={{ text: e.text, author: e.author }} inline />
+                                                ) : (
+                                                  <span className="text-slate-400">โดย {e.author}</span>
+                                                )}
+                                              </p>
+                                            ))}
+                                          </div>
+                                        )}
+                                        {itemPhotos.length > 0 && (
+                                          <div className="mt-1 flex flex-wrap gap-2">
+                                            {itemPhotos.map((p) => (
+                                              <img
+                                                key={p.id}
+                                                src={getTopicPhotoUrl(p.file_path)}
+                                                alt={p.file_name ?? ''}
+                                                className="h-20 w-20 rounded-md border border-slate-200 object-cover"
+                                              />
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               ))}
                             </td>
