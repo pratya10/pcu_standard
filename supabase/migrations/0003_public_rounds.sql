@@ -4,4 +4,4 @@
 -- RLS change is needed for the public history page to query this column.
 
 alter table public.assessment_rounds
-  add column is_public boolean not null default false;
+  add column if not exists is_public boolean not null default false;
