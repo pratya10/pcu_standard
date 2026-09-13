@@ -166,6 +166,8 @@ export type Score = {
   updated_at: string
 }
 
+export type TeamItemNote = ItemNote & { checkedBy?: string | null }
+
 export type TeamScore = {
   id: string
   round_id: string
@@ -174,8 +176,9 @@ export type TeamScore = {
   is_na: boolean
   must_pass: boolean | null
   comment: string | null
-  item_notes: Record<string, ItemNote>
+  item_notes: Record<string, TeamItemNote>
   updated_by: string | null
+  must_pass_updated_by: string | null
   updated_at: string
 }
 

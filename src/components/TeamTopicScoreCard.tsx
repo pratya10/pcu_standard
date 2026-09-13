@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { ItemNote, ScoreValue, TeamScore, Topic, TopicEvidenceItem, TopicPhoto, TopicScoreItem } from '../types'
+import type { ScoreValue, TeamScore, Topic, TopicEvidenceItem, TopicPhoto, TopicScoreItem } from '../types'
 import {
   deleteTopicPhoto,
   getTopicPhotoUrl,
@@ -86,7 +86,7 @@ export default function TeamTopicScoreCard({
     return participantNameById.get(id) ?? 'กรรมการ'
   }
 
-  async function persist(next: Partial<TeamScoreDraft>) {
+  async function persist(next: Partial<TeamScoreDraft>, attribution: { ci?: boolean; must?: boolean } = {}) {
     if (readOnly) return
     const merged: TeamScoreDraft = {
       roundId,
@@ -99,7 +99,7 @@ export default function TeamTopicScoreCard({
     }
     setSaving(true)
     try {
-      const saved = await upsertTeamScore(merged, participantId)
+      const saved = await upsertTeamScore(merged, participantId, attribution)
       onSaved(saved)
     } finally {
       setSaving(false)
@@ -118,7 +118,7 @@ export default function TeamTopicScoreCard({
       if (!ok) return
       await logTeamScoreOverwrite({ roundId, topicId: topic.id, field: 'score', participantId, oldValue: score, newValue: v })
     }
-    await persist({ score: v, isNa: false })
+    await persist({ score: v, isNa: false }, { ci: true })
   }
 
   async function applyNa() {
@@ -133,7 +133,7 @@ export default function TeamTopicScoreCard({
       if (!ok) return
       await logTeamScoreOverwrite({ roundId, topicId: topic.id, field: 'score', participantId, oldValue: score, newValue: 'NA' })
     }
-    await persist({ isNa: true, score: null })
+    await persist({ isNa: true, score: null }, { ci: true })
   }
 
   async function applyMustPass(v: boolean) {
@@ -141,13 +141,13 @@ export default function TeamTopicScoreCard({
     if (mustPass !== null && mustPass !== v) {
       const ok = await confirm({
         title: 'ยืนยันเปลี่ยนผล The Must',
-        message: `หัวข้อนี้ถูกระบุว่า "${mustPass ? 'ผ่าน' : 'ไม่ผ่าน'}" ไว้แล้วโดย ${editorName(teamScore?.updated_by)}\nต้องการเปลี่ยนเป็น "${v ? 'ผ่าน' : 'ไม่ผ่าน'}" หรือไม่?`,
+        message: `หัวข้อนี้ถูกระบุว่า "${mustPass ? 'ผ่าน' : 'ไม่ผ่าน'}" ไว้แล้วโดย ${editorName(teamScore?.must_pass_updated_by)}\nต้องการเปลี่ยนเป็น "${v ? 'ผ่าน' : 'ไม่ผ่าน'}" หรือไม่?`,
         confirmLabel: 'ยืนยันเปลี่ยน',
       })
       if (!ok) return
       await logTeamScoreOverwrite({ roundId, topicId: topic.id, field: 'must_pass', participantId, oldValue: mustPass, newValue: v })
     }
-    await persist({ mustPass: v })
+    await persist({ mustPass: v }, { must: true })
   }
 
   async function applyItemChecked(itemId: string, checked: boolean) {
@@ -156,7 +156,7 @@ export default function TeamTopicScoreCard({
     if (current && current.checked !== checked) {
       const ok = await confirm({
         title: 'ยืนยันเปลี่ยนค่า',
-        message: `ข้อนี้ถูกตั้งไว้แล้วว่า "${current.checked ? 'มี' : 'ไม่มี'}"\nต้องการเปลี่ยนเป็น "${checked ? 'มี' : 'ไม่มี'}" หรือไม่?`,
+        message: `ข้อนี้ถูกตั้งไว้แล้วว่า "${current.checked ? 'มี' : 'ไม่มี'}" โดย ${editorName(current.checkedBy)}\nต้องการเปลี่ยนเป็น "${checked ? 'มี' : 'ไม่มี'}" หรือไม่?`,
         confirmLabel: 'ยืนยันเปลี่ยน',
       })
       if (!ok) return
@@ -170,7 +170,7 @@ export default function TeamTopicScoreCard({
         newValue: checked,
       })
     }
-    const next = { ...itemNotes, [itemId]: { checked, comment: current?.comment ?? '' } }
+    const next = { ...itemNotes, [itemId]: { checked, checkedBy: participantId, comment: current?.comment ?? '' } }
     await persist({ itemNotes: next })
   }
 
@@ -262,6 +262,7 @@ export default function TeamTopicScoreCard({
                   {itemPhotos.length > 0 ? itemPhotos.length : ''}
                 </button>
               </div>
+              {note?.checkedBy && <p className="mt-0.5 pl-[52px] text-[10px] text-slate-400">แก้ล่าสุดโดย {editorName(note.checkedBy)}</p>}
               {commentOpen && (
                 <div className="mt-1.5 pl-9">
                   {note?.comment && (
@@ -428,6 +429,9 @@ export default function TeamTopicScoreCard({
                   ✓ ผ่าน
                 </button>
               </div>
+              {teamScore?.must_pass_updated_by && mustPass !== null && (
+                <p className="mt-1 text-[11px] text-slate-400">แก้ล่าสุดโดย {editorName(teamScore.must_pass_updated_by)}</p>
+              )}
             </div>
           )}
 
@@ -456,6 +460,7 @@ export default function TeamTopicScoreCard({
                 </button>
               )}
             </div>
+            {teamScore?.updated_by && answered && <p className="mt-1 text-[11px] text-slate-400">แก้ล่าสุดโดย {editorName(teamScore.updated_by)}</p>}
           </div>
 
           <div>
@@ -535,5 +540,3 @@ function StatusBadge({ answered, isNa, score }: { answered: boolean; isNa: boole
   const color = score === 2 ? 'bg-emerald-100 text-emerald-700' : score === 1 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
   return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>{score} คะแนน</span>
 }
-
-export type { ItemNote as TeamItemNote }

@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient'
-import type { ItemNote, Score, ScoreValue, TeamScore, TeamScoreAudit, TeamScoreAuditField } from '../types'
+import type { Score, ScoreValue, TeamItemNote, TeamScore, TeamScoreAudit, TeamScoreAuditField } from '../types'
 
 // Lets a collaborative round's single shared team_scores row flow through
 // the exact same aggregate/report/docx code that 'average' mode already
@@ -44,28 +44,32 @@ export type TeamScoreDraft = {
   isNa: boolean
   mustPass: boolean | null
   comment: string
-  itemNotes: Record<string, ItemNote>
+  itemNotes: Record<string, TeamItemNote>
 }
 
-export async function upsertTeamScore(draft: TeamScoreDraft, participantId: string): Promise<TeamScore> {
-  const { data, error } = await supabase
-    .from('team_scores')
-    .upsert(
-      {
-        round_id: draft.roundId,
-        topic_id: draft.topicId,
-        score: draft.isNa ? null : draft.score,
-        is_na: draft.isNa,
-        must_pass: draft.mustPass,
-        comment: draft.comment || null,
-        item_notes: draft.itemNotes,
-        updated_by: participantId,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'round_id,topic_id' },
-    )
-    .select()
-    .single()
+// `attribution` says which specific control this save came from, so only
+// that field's "who set this" column gets stamped — a comment-only or
+// item-only save shouldn't silently reassign the CI score's or Must
+// result's attribution to whoever happened to save last.
+export async function upsertTeamScore(
+  draft: TeamScoreDraft,
+  participantId: string,
+  attribution: { ci?: boolean; must?: boolean } = {},
+): Promise<TeamScore> {
+  const payload: Record<string, unknown> = {
+    round_id: draft.roundId,
+    topic_id: draft.topicId,
+    score: draft.isNa ? null : draft.score,
+    is_na: draft.isNa,
+    must_pass: draft.mustPass,
+    comment: draft.comment || null,
+    item_notes: draft.itemNotes,
+    updated_at: new Date().toISOString(),
+  }
+  if (attribution.ci) payload.updated_by = participantId
+  if (attribution.must) payload.must_pass_updated_by = participantId
+
+  const { data, error } = await supabase.from('team_scores').upsert(payload, { onConflict: 'round_id,topic_id' }).select().single()
   if (error) throw error
   return data as TeamScore
 }

@@ -3,6 +3,10 @@
 :root {
   color-scheme: light;
   font-family: 'Noto Sans Thai', system-ui, 'Segoe UI', Roboto, sans-serif;
+  /* Bumps every rem-based size (Tailwind's text and spacing utilities)
+     up ~12% app-wide, since many evaluators are older staff who asked for
+     larger, easier-to-read text without redoing every component by hand. */
+  font-size: 112.5%;
 }
 
 html, body, #root {
