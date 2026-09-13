@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { formatAdminName, getMyAdminProfile } from '../lib/adminProfile'
+import BrandLogo from './BrandLogo'
 
 function formatBuildDate(iso: string) {
   const d = new Date(iso)
@@ -63,6 +64,7 @@ export default function AdminLayout({
       {/* Desktop sidebar */}
       <aside className="hidden w-56 shrink-0 border-r border-slate-200 bg-white md:flex md:flex-col">
         <div className="border-b border-slate-100 p-4">
+          <BrandLogo className="mb-2 h-10 w-auto object-contain" />
           <p className="text-xs text-slate-400">ระบบประเมินมาตรฐาน PCU</p>
           <p className="truncate text-sm font-medium text-slate-700">{displayName}</p>
         </div>

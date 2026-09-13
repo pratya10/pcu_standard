@@ -10,7 +10,7 @@ function formatBuildDate(iso: string) {
 export default function VersionFooter() {
   return (
     <div className="mt-6 flex flex-col items-center gap-3">
-      <p className="text-xs text-slate-400">
+      <p className="text-[10px] text-slate-400">
         Version {__APP_VERSION__} | {formatBuildDate(__BUILD_DATE__)} ( {__GIT_HASH__} )
       </p>
       <div className="h-px w-full max-w-xs bg-slate-200" />

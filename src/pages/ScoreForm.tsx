@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabaseClient'
 import { loadStandardByVersionId, allTopicsFlat } from '../lib/loadStandard'
 import { fetchScoresForParticipant, upsertScore } from '../lib/scoresApi'
 import { fetchTeamScoresForRound, subscribeToTeamScores } from '../lib/teamScoresApi'
 import { subscribeToPresence, type PresenceInfo } from '../lib/presence'
 import { getParticipantSession } from '../lib/participantSession'
-import type { AssessmentRound, FullStandard, Participant, Score, TeamScore } from '../types'
+import type { AssessmentRound, Facility, FullStandard, Participant, Score, TeamScore } from '../types'
 import TopicScoreCard from '../components/TopicScoreCard'
 import TeamTopicScoreCard from '../components/TeamTopicScoreCard'
 import Icon from '../components/Icon'
+import { formatThaiDate } from '../lib/thaiDate'
 
 type SectionTopic = FullStandard['categories'][number]['topics'][number]
 
@@ -33,6 +35,7 @@ export default function ScoreForm() {
   const { roundId } = useParams<{ roundId: string }>()
   const navigate = useNavigate()
   const [round, setRound] = useState<AssessmentRound | null>(null)
+  const [facility, setFacility] = useState<Facility | null>(null)
   const [standard, setStandard] = useState<FullStandard | null>(null)
   const [scores, setScores] = useState<Score[]>([])
   const [teamScores, setTeamScores] = useState<TeamScore[]>([])
@@ -60,6 +63,7 @@ export default function ScoreForm() {
     let cancelled = false
     setLoading(true)
     setRound(null)
+    setFacility(null)
     setStandard(null)
     setScores([])
     setTeamScores([])
@@ -74,12 +78,14 @@ export default function ScoreForm() {
         return
       }
       const round = roundRow as AssessmentRound
-      const [std, parts] = await Promise.all([
+      const [std, parts, { data: fac }] = await Promise.all([
         loadStandardByVersionId(round.standard_version_id),
         supabase.from('participants').select('*').eq('round_id', rid).order('joined_at'),
+        supabase.from('facilities').select('*').eq('id', round.facility_id).single(),
       ])
       if (cancelled) return
       setParticipants((parts.data as Participant[]) ?? [])
+      setFacility((fac as Facility) ?? null)
       if (round.scoring_mode === 'collaborative') {
         const teamRows = await fetchTeamScoresForRound(rid)
         if (cancelled) return
@@ -315,6 +321,8 @@ export default function ScoreForm() {
     )
   }
 
+  const joinUrl = typeof window !== 'undefined' ? `${window.location.origin}${import.meta.env.BASE_URL}join` : ''
+
   const navList = (
     <>
       <div className="mb-1 flex items-center justify-between">
@@ -397,6 +405,13 @@ export default function ScoreForm() {
           หน้าแอดมิน
         </Link>
       </div>
+
+      <div className="mt-3 flex flex-col items-center gap-2 border-t border-slate-100 pt-3 text-center">
+        <p className="text-xs font-semibold text-slate-400">ชวนกรรมการคนอื่นเข้าร่วม</p>
+        <p className="font-mono text-2xl font-bold tracking-widest text-slate-800">{round.join_code}</p>
+        <QRCodeSVG value={joinUrl} size={112} />
+        <p className="text-[11px] text-slate-400">สแกนหรือใช้รหัสนี้ที่หน้า "เข้าร่วมรอบการประเมิน"</p>
+      </div>
     </>
   )
 
@@ -426,8 +441,7 @@ export default function ScoreForm() {
 
       <div className="min-w-0 flex-1">
         <div className="sticky top-0 z-10 mb-4 -mx-4 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur md:mx-0 md:rounded-xl md:border">
-          <div className="flex items-start justify-between gap-2">
-            <h1 className="text-lg font-bold text-slate-800">{round.name}</h1>
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setNavOpen(true)}
@@ -435,7 +449,11 @@ export default function ScoreForm() {
             >
               ☰ หมวดหมู่
             </button>
+            <h1 className="min-w-0 flex-1 truncate text-lg font-bold text-slate-800">{round.name}</h1>
           </div>
+          <p className="mt-0.5 truncate text-xs text-slate-400">
+            {facility?.name ?? '-'} · {formatThaiDate(round.survey_date, 'ยังไม่กำหนดวัน')}
+          </p>
           <div className="mt-2 flex items-center justify-between text-sm">
             <span className="text-slate-500">
               {session.name} · {session.role === 'evaluator' ? 'กรรมการประเมิน' : session.role === 'viewer' ? 'ผู้สังเกตการณ์' : session.role}

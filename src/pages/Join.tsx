@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient'
 import { randomDeviceKey, saveParticipantSession } from '../lib/participantSession'
 import { searchCommitteeMembers, updateCommitteeMember } from '../lib/committeeSearch'
 import { useConfirm } from '../components/ConfirmProvider'
+import VersionFooter from '../components/VersionFooter'
 import type { CommitteeMember, ParticipantRole } from '../types'
 
 function DiffRow({ label, oldValue, newValue }: { label: string; oldValue: string; newValue: string }) {
@@ -190,7 +191,7 @@ export default function Join() {
       <h1 className="mb-6 text-center text-2xl font-bold text-slate-800">เข้าร่วมรอบการประเมิน</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
         <div>
-          <label className="mb-1 block text-lg font-semibold text-slate-700">รหัสเข้าร่วม (Join Code)</label>
+          <label className="mb-1 block text-lg font-semibold text-slate-700">รหัสเข้าร่วม</label>
           <input
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
@@ -211,9 +212,6 @@ export default function Join() {
             className="w-full rounded-xl border border-slate-300 px-4 py-4 text-lg"
             autoComplete="off"
           />
-          {selectedMember && (
-            <p className="mt-1 text-base text-emerald-700">✓ พบในทะเบียน — เติมข้อมูลให้อัตโนมัติแล้ว</p>
-          )}
           {showSuggestions && suggestions.length > 0 && (
             <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border border-slate-300 bg-white shadow-lg">
               {suggestions.map((m) => (
@@ -290,6 +288,8 @@ export default function Join() {
           {loading ? 'กำลังเข้าร่วม...' : 'เข้าร่วม'}
         </button>
       </form>
+
+      <VersionFooter />
     </div>
   )
 }
