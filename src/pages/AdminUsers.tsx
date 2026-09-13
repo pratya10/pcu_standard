@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import type { AdminAllowlistEntry } from '../types'
 import { addAdminUser, listAdminUsers, removeAdminUser } from '../lib/adminUsers'
-import { listAdminProfilesByEmail } from '../lib/adminProfile'
+import { getMyAdminProfile, listAdminProfilesByEmail } from '../lib/adminProfile'
 import { useConfirm } from '../components/ConfirmProvider'
 import { formatThaiDate } from '../lib/thaiDate'
 import AdminLayout from '../components/AdminLayout'
@@ -15,6 +15,7 @@ export default function AdminUsers() {
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
   const [myEmail, setMyEmail] = useState<string | null>(null)
+  const [myProfile, setMyProfile] = useState<AdminProfile | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -32,6 +33,11 @@ export default function AdminUsers() {
   useEffect(() => {
     load()
     supabase.auth.getUser().then(({ data }) => setMyEmail(data.user?.email ?? null))
+    // The email-keyed profile map above can miss the current user's own
+    // profile if its `email` column was never backfilled, so look it up
+    // directly by user_id (same source AdminLayout's sidebar name uses) as
+    // a reliable fallback for just this one row.
+    getMyAdminProfile().then(setMyProfile)
   }, [])
 
   async function handleAdd(e: React.FormEvent) {
@@ -98,7 +104,8 @@ export default function AdminUsers() {
       ) : (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
           {users.map((u) => {
-            const profile = profilesByEmail.get(u.email.toLowerCase())
+            const isMe = u.email === myEmail
+            const profile = profilesByEmail.get(u.email.toLowerCase()) ?? (isMe ? myProfile : null)
             const fullName = profile ? [profile.first_name, profile.last_name].filter(Boolean).join(' ') : ''
             return (
               <div key={u.email} className="flex items-center justify-between border-b border-slate-100 px-4 py-3 text-sm last:border-0">

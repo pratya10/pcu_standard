@@ -231,7 +231,7 @@ export default function AdminRoundDetail() {
         </div>
 
         <div className="flex w-full flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-5">
-          <p className="mb-2 text-sm text-slate-500">รหัสเข้าร่วม (Join Code)</p>
+          <p className="mb-2 text-sm text-slate-500">รหัสเข้าร่วม</p>
           {editingCode ? (
             <div className="mb-3 flex flex-col items-center gap-2">
               <input
@@ -283,7 +283,7 @@ export default function AdminRoundDetail() {
           >
             <QRCodeSVG value={joinUrl} size={120} />
           </a>
-          <p className="mt-2 text-xs text-slate-400">แตะที่ QR code เพื่อเปิดหน้าเข้าร่วมในแท็บใหม่</p>
+          <p className="mt-2 text-xs text-slate-400">แตะที่ QR code</p>
         </div>
       </div>
 

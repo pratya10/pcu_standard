@@ -124,6 +124,59 @@ export default function LiveDashboard() {
         ))}
       </div>
 
+      {evaluators.length > 0 && (
+        <div className="mb-6">
+          <h2 className="mb-2 text-sm font-bold text-slate-700">ตารางคะแนนรายบุคคล</h2>
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+            <table className="w-full min-w-max border-collapse text-sm whitespace-nowrap">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs text-slate-500">
+                  <th className="sticky left-0 bg-slate-50 px-3 py-2 font-medium">หัวข้อ</th>
+                  {evaluators.map((p) => (
+                    <th key={p.id} className="px-3 py-2 text-center font-medium">
+                      {p.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {flatTopics.map((t) => {
+                  const agg = aggregates.get(t.id)
+                  return (
+                    <tr key={t.id} className="border-b border-slate-100 last:border-0">
+                      <td className="sticky left-0 bg-white px-3 py-2 text-slate-700">
+                        <span className="font-mono text-xs text-slate-400">{t.code}</span> {t.name_th}
+                      </td>
+                      {evaluators.map((p) => {
+                        const s = agg?.scores.find((sc) => sc.participant_id === p.id)
+                        return (
+                          <td key={p.id} className="px-3 py-2 text-center">
+                            {!s ? (
+                              <span className="text-slate-300">-</span>
+                            ) : s.is_na ? (
+                              <span className="font-semibold text-slate-500">N/A</span>
+                            ) : (
+                              <span
+                                className={`font-semibold ${s.score === 2 ? 'text-emerald-600' : s.score === 1 ? 'text-amber-600' : 'text-red-600'}`}
+                              >
+                                {s.score}
+                              </span>
+                            )}
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          {round.scoring_mode === 'collaborative' && (
+            <p className="mt-1 text-xs text-slate-400">โหมดทีมช่วยกัน: คะแนนแต่ละหัวข้อมีชุดเดียว แสดงในคอลัมน์ของคนที่บันทึกคะแนนล่าสุด</p>
+          )}
+        </div>
+      )}
+
       {standard.categories.map((cat) => {
         const catTopics = [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
         const catTotal = catTopics.reduce((sum, t) => sum + (aggregates.get(t.id)?.avgScore ?? 0), 0)

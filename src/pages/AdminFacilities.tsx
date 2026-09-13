@@ -6,6 +6,7 @@ import { useConfirm } from '../components/ConfirmProvider'
 
 const emptyForm = {
   code: '',
+  pcu_code: '',
   name: '',
   facility_type: 'รพ.สต.',
   affiliation: '',
@@ -40,6 +41,7 @@ export default function AdminFacilities() {
     setEditingId(f.id)
     setForm({
       code: f.code ?? '',
+      pcu_code: f.pcu_code ?? '',
       name: f.name,
       facility_type: f.facility_type ?? 'รพ.สต.',
       affiliation: f.affiliation ?? '',
@@ -67,7 +69,7 @@ export default function AdminFacilities() {
     }
     setSaving(true)
     setError(null)
-    const payload = { ...form, code: form.code.trim() || null }
+    const payload = { ...form, code: form.code.trim() || null, pcu_code: form.pcu_code.trim() || null }
     const { error } = editingId
       ? await supabase.from('facilities').update(payload).eq('id', editingId)
       : await supabase.from('facilities').insert(payload)
@@ -110,6 +112,12 @@ export default function AdminFacilities() {
           placeholder="รหัสหน่วยบริการ 5 หลัก"
           value={form.code}
           onChange={(e) => setForm({ ...form, code: e.target.value })}
+          className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        />
+        <input
+          placeholder="รหัส PCU 7 หลัก"
+          value={form.pcu_code}
+          onChange={(e) => setForm({ ...form, pcu_code: e.target.value })}
           className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
         <input
@@ -193,6 +201,7 @@ export default function AdminFacilities() {
             <thead className="bg-slate-50 text-left text-slate-500">
               <tr>
                 <th className="px-3 py-2">รหัส</th>
+                <th className="px-3 py-2">รหัส PCU</th>
                 <th className="px-3 py-2">ชื่อหน่วยบริการ</th>
                 <th className="px-3 py-2">ประเภท</th>
                 <th className="px-3 py-2">อำเภอ/จังหวัด</th>
@@ -204,6 +213,7 @@ export default function AdminFacilities() {
               {facilities.map((f) => (
                 <tr key={f.id} className="border-t border-slate-100">
                   <td className="px-3 py-2 font-mono">{f.code ?? '-'}</td>
+                  <td className="px-3 py-2 font-mono">{f.pcu_code ?? '-'}</td>
                   <td className="px-3 py-2 font-medium">{f.name}</td>
                   <td className="px-3 py-2">{f.facility_type}</td>
                   <td className="px-3 py-2">
@@ -222,7 +232,7 @@ export default function AdminFacilities() {
               ))}
               {facilities.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-slate-400">
+                  <td colSpan={7} className="px-3 py-6 text-center text-slate-400">
                     ยังไม่มีหน่วยบริการ
                   </td>
                 </tr>

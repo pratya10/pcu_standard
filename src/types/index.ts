@@ -1,6 +1,7 @@
 export type Facility = {
   id: string
   code: string | null
+  pcu_code: string | null
   name: string
   facility_type: string | null
   affiliation: string | null
