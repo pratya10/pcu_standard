@@ -13,7 +13,7 @@ import RequireAdmin from './components/RequireAdmin'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/pcustandard71">
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/join" element={<Join />} />

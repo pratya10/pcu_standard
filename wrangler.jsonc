@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pcu-standard",
+  "compatibility_date": "2026-09-13",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    {
+      "pattern": "mshprimary.com/pcustandard71*",
+      "zone_name": "mshprimary.com"
+    }
+  ]
+}
