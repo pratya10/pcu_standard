@@ -221,6 +221,16 @@ export default function ScoreForm() {
     })
   }
 
+  function goToTopic(topicId: string, parentBlockId: string) {
+    setActiveSectionId(parentBlockId)
+    setNavOpen(false)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.getElementById(`topic-${topicId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+    })
+  }
+
   async function handleSave(topicId: string, draft: Parameters<Parameters<typeof TopicScoreCard>[0]['onSave']>[0]) {
     const saved = await upsertScore({
       roundId: roundId!,
@@ -246,36 +256,31 @@ export default function ScoreForm() {
     })
   }
 
-  function ScoreBadges({ summary }: { summary: Summary }) {
-    const mustClass =
-      summary.mustAnswered === 0
-        ? 'text-slate-400'
-        : summary.mustPass === summary.mustTotal
-          ? 'bg-emerald-100 text-emerald-700'
-          : 'bg-slate-200 text-slate-600'
-    const ciClass =
-      summary.ciAnswered === 0
-        ? 'text-slate-400'
-        : summary.ciMax > 0 && summary.ciAchieved === summary.ciMax
-          ? 'bg-emerald-100 text-emerald-700'
-          : 'bg-slate-200 text-slate-600'
-    return (
-      <span className="flex gap-1 pl-[18px]">
-        {summary.mustTotal > 0 && (
-          <span title="The Must" className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${mustClass}`}>
-            {summary.mustPass} | {summary.mustTotal}
-          </span>
-        )}
-        <span title="Continuous Improvement" className={`rounded-md px-1.5 py-0.5 text-[11px] font-semibold ${ciClass}`}>
-          {summary.ciAchieved} | {summary.ciMax}
-        </span>
-      </span>
-    )
-  }
-
   function NavDot({ color, complete }: { color: string; complete: boolean }) {
     if (complete) return <Icon name="check_circle" filled className="!text-base shrink-0 text-emerald-600" />
     return <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+  }
+
+  function TopicNavRow({ topic, parentBlockId }: { topic: SectionTopic; parentBlockId: string }) {
+    const r = resultFor(topic.id)
+    const hasMust = !!topic.must_text
+    const mustLabel = !hasMust ? null : r?.mustPass === true ? 'ผ่าน' : r?.mustPass === false ? 'ไม่ผ่าน' : '-'
+    const ciLabel = r?.isNa ? 'NA' : (r?.score ?? '-')
+    const mustClass = mustLabel === 'ผ่าน' ? 'text-emerald-600' : mustLabel === 'ไม่ผ่าน' ? 'text-red-600' : 'text-slate-400'
+    const ciClass = ciLabel === '-' ? 'text-slate-400' : 'text-slate-700'
+    return (
+      <button
+        type="button"
+        onClick={() => goToTopic(topic.id, parentBlockId)}
+        className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] font-medium text-slate-600 hover:bg-slate-50"
+      >
+        <span className="truncate font-mono text-slate-400">{topic.code}</span>
+        <span className="flex shrink-0 items-center gap-1">
+          {mustLabel !== null && <span className={mustClass}>{mustLabel}</span>}
+          <span className={ciClass}>| {ciLabel}</span>
+        </span>
+      </button>
+    )
   }
 
   const navList = (
@@ -298,36 +303,42 @@ export default function ScoreForm() {
           <div key={top.id}>
             <button
               type="button"
-              onClick={() => (hasSub ? toggleExpanded(top.id) : selectSection(top.id))}
-              className={`flex w-full flex-col gap-0.5 rounded-lg px-2 py-2 text-left text-xs font-medium ${active ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}
+              onClick={() => toggleExpanded(top.id)}
+              className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs font-medium ${active ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}
             >
-              <span className="flex items-center gap-2">
-                <NavDot color={top.color} complete={isComplete(summary, topicsForSummary.length)} />
-                <span className="flex-1 truncate">{top.navLabel}</span>
-                {hasSub && <span className="text-slate-300">{isOpen ? '▾' : '▸'}</span>}
-              </span>
-              <ScoreBadges summary={summary} />
+              <NavDot color={top.color} complete={isComplete(summary, topicsForSummary.length)} />
+              <span className="flex-1 truncate">{top.navLabel}</span>
+              <span className="text-slate-300">{isOpen ? '▾' : '▸'}</span>
             </button>
-            {hasSub && isOpen && (
+            {isOpen && (
               <div className="ml-3 flex flex-col gap-1 border-l border-slate-100 pl-2">
-                {top.subSections.map((sub) => {
-                  const subSummary = summarize(sub.topics)
-                  const subActive = activeSectionId === sub.id
-                  return (
-                    <button
-                      key={sub.id}
-                      type="button"
-                      onClick={() => selectSection(sub.id)}
-                      className={`flex flex-col gap-0.5 rounded-lg px-2 py-2 text-left text-xs font-medium ${subActive ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <NavDot color={sub.color} complete={isComplete(subSummary, sub.topics.length)} />
-                        <span className="flex-1 truncate">{sub.navLabel}</span>
-                      </span>
-                      <ScoreBadges summary={subSummary} />
-                    </button>
-                  )
-                })}
+                {hasSub
+                  ? top.subSections.map((sub) => {
+                      const subSummary = summarize(sub.topics)
+                      const subOpen = expanded.has(sub.id)
+                      const subActive = activeSectionId === sub.id
+                      return (
+                        <div key={sub.id}>
+                          <button
+                            type="button"
+                            onClick={() => toggleExpanded(sub.id)}
+                            className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs font-medium ${subActive ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}
+                          >
+                            <NavDot color={sub.color} complete={isComplete(subSummary, sub.topics.length)} />
+                            <span className="flex-1 truncate">{sub.navLabel}</span>
+                            <span className="text-slate-300">{subOpen ? '▾' : '▸'}</span>
+                          </button>
+                          {subOpen && (
+                            <div className="ml-3 flex flex-col border-l border-slate-100 pl-2">
+                              {sub.topics.map((t) => (
+                                <TopicNavRow key={t.id} topic={t} parentBlockId={sub.id} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })
+                  : top.topics.map((t) => <TopicNavRow key={t.id} topic={t} parentBlockId={top.id} />)}
               </div>
             )}
           </div>
@@ -358,7 +369,7 @@ export default function ScoreForm() {
   )
 
   return (
-    <div className="mx-auto flex max-w-5xl gap-4 px-4 py-6 pb-20">
+    <div className="flex w-full gap-4 px-4 py-6 pb-20">
       <nav className="sticky top-4 hidden h-fit w-52 shrink-0 flex-col gap-1 rounded-xl border border-slate-200 bg-white p-3 md:flex">
         {navList}
       </nav>
@@ -407,7 +418,9 @@ export default function ScoreForm() {
               style={{ width: `${flatTopics.length ? (answeredCount / flatTopics.length) * 100 : 0}%` }}
             />
           </div>
-          <p className="mt-1.5 text-[11px] text-slate-400">ระบบบันทึกผลอัตโนมัติทันทีที่กดเลือก ไม่ต้องกด Save</p>
+          <p className="mt-1.5 text-[11px] text-slate-400">
+            Save อัตโนมัติ{collaborative && ' | การประเมินแบบทีม'}
+          </p>
           {online.length > 0 && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <span className="text-[11px] text-slate-400">ออนไลน์ตอนนี้:</span>
@@ -422,9 +435,6 @@ export default function ScoreForm() {
               ))}
             </div>
           )}
-          {collaborative && (
-            <p className="mt-1 text-[11px] font-medium text-sky-600">โหมดทีมคณะกรรมช่วยกัน — ทุกคนเห็นและแก้ไขคะแนนชุดเดียวกันแบบ real-time</p>
-          )}
           {readOnly && (
             <p className="mt-2 rounded-lg bg-slate-100 p-2 text-xs text-slate-500">
               {round.status === 'completed' ? 'รอบนี้ปิดรับคะแนนแล้ว (โหมดดูอย่างเดียว)' : 'ผู้สังเกตการณ์ดูข้อมูลได้อย่างเดียว'}
@@ -438,33 +448,33 @@ export default function ScoreForm() {
               {s.headerLabel}
             </h2>
             <div className="mb-3 flex flex-col gap-2">
-              {s.topics.map((t) =>
-                collaborative ? (
-                  <TeamTopicScoreCard
-                    key={t.id}
-                    topic={t}
-                    teamScore={teamScoreByTopic.get(t.id)}
-                    readOnly={readOnly}
-                    roundId={roundId!}
-                    participantId={session.participantId}
-                    participantName={session.name}
-                    participantNameById={participantNameById}
-                    accentColor={s.color}
-                    onSaved={handleTeamSaved}
-                  />
-                ) : (
-                  <TopicScoreCard
-                    key={t.id}
-                    topic={t}
-                    existing={scoreByTopic.get(t.id)}
-                    readOnly={readOnly}
-                    roundId={roundId!}
-                    participantId={session.participantId}
-                    accentColor={s.color}
-                    onSave={(draft) => handleSave(t.id, draft)}
-                  />
-                ),
-              )}
+              {s.topics.map((t) => (
+                <div key={t.id} id={`topic-${t.id}`} className="scroll-mt-40">
+                  {collaborative ? (
+                    <TeamTopicScoreCard
+                      topic={t}
+                      teamScore={teamScoreByTopic.get(t.id)}
+                      readOnly={readOnly}
+                      roundId={roundId!}
+                      participantId={session.participantId}
+                      participantName={session.name}
+                      participantNameById={participantNameById}
+                      accentColor={s.color}
+                      onSaved={handleTeamSaved}
+                    />
+                  ) : (
+                    <TopicScoreCard
+                      topic={t}
+                      existing={scoreByTopic.get(t.id)}
+                      readOnly={readOnly}
+                      roundId={roundId!}
+                      participantId={session.participantId}
+                      accentColor={s.color}
+                      onSave={(draft) => handleSave(t.id, draft)}
+                    />
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         ))}
