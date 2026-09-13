@@ -12,9 +12,10 @@ export default function Home() {
 
       <Link
         to="/join"
-        className="rounded-2xl bg-emerald-600 px-6 py-5 text-center text-lg font-semibold text-white shadow-sm active:scale-[0.98]"
+        className="rounded-2xl bg-emerald-600 px-6 py-5 text-center text-white shadow-sm active:scale-[0.98]"
       >
-        เข้าร่วมประเมิน (กรรมการ / ผู้สังเกตการณ์)
+        <span className="block text-xl font-bold">เข้าร่วมประเมิน</span>
+        <span className="block text-sm font-medium text-emerald-50">(กรรมการ และ ผู้สังเกตการณ์)</span>
       </Link>
 
       <Link
