@@ -10,7 +10,24 @@ import { formatThaiDateTime } from '../lib/thaiDate'
 import BrandLogo from '../components/BrandLogo'
 import { downloadBlob, generateReportDocx } from '../lib/docxExport'
 import { formatThaiDate } from '../lib/thaiDate'
-import { getTopicPhotoUrl, listRoundPhotos } from '../lib/topicPhotos'
+import { getTopicPhotoUrl, groupPhotosByTopicAndItem, listRoundPhotos } from '../lib/topicPhotos'
+
+// "ความคิดเห็นที่ N : ... โดย ..." — one evaluator's comment per line, numbered
+// within its own group (a topic's general comments and each sub-item's
+// comments are numbered separately), with no extra status text.
+function buildCommentLines(scores: Score[] | undefined, evaluatorNameById: Map<string, string>, pick: (s: Score) => string | null | undefined): string[] {
+  if (!scores) return []
+  const lines: string[] = []
+  let n = 0
+  for (const s of scores) {
+    const comment = pick(s)
+    if (!comment) continue
+    n++
+    const name = evaluatorNameById.get(s.participant_id) ?? 'กรรมการ'
+    lines.push(`ความคิดเห็นที่ ${n} : ${comment} โดย ${name}`)
+  }
+  return lines
+}
 
 export default function Report() {
   const { roundId } = useParams<{ roundId: string }>()
@@ -135,15 +152,7 @@ export default function Report() {
   const aggregates = useMemo(() => aggregateAll(flatTopics.map((t) => t.id), scores), [flatTopics, scores])
   const evaluators = participants.filter((p) => p.role !== 'viewer')
   const evaluatorNameById = useMemo(() => new Map(participants.map((p) => [p.id, p.name])), [participants])
-  const photosByTopic = useMemo(() => {
-    const map = new Map<string, TopicPhoto[]>()
-    for (const p of photos) {
-      const list = map.get(p.topic_id) ?? []
-      list.push(p)
-      map.set(p.topic_id, list)
-    }
-    return map
-  }, [photos])
+  const photosByTopicAndItem = useMemo(() => groupPhotosByTopicAndItem(photos), [photos])
   const itemTextById = useMemo(() => {
     const map = new Map<string, string>()
     for (const t of flatTopics) for (const it of t.scoreItems) map.set(it.id, it.item_text)
@@ -164,7 +173,7 @@ export default function Report() {
         grandTotal: flatTopics.reduce((sum, t) => sum + (aggregates.get(t.id)?.avgScore ?? 0), 0),
         mustFailCount: flatTopics.filter((t) => aggregates.get(t.id)?.mustPassFinal === false).length,
         includeComments,
-        photosByTopic: includeComments ? photosByTopic : undefined,
+        photosByTopicAndItem: includeComments ? photosByTopicAndItem : undefined,
       })
       const suffix = includeComments ? 'with-comments' : 'no-comments'
       downloadBlob(blob, `pcu-report-${round.join_code}-${suffix}.docx`)
@@ -209,12 +218,7 @@ export default function Report() {
   const overallPass = mustFailTopics.length === 0
 
   return (
-    <div
-      ref={printAreaRef}
-      className={`mx-auto max-w-3xl px-6 py-8 print:px-0 print:py-0 ${
-        printMode === 'summary' ? 'print:flex print:min-h-[250mm] print:flex-col print:justify-between' : ''
-      }`}
-    >
+    <div ref={printAreaRef} className="mx-auto max-w-3xl px-6 py-8 print:px-0 print:py-0">
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-2">
           <Link to={`/round/${roundId}/score`} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600">
@@ -275,13 +279,13 @@ export default function Report() {
         )}
       </div>
 
-      <div className="mb-6 text-center print:mb-0">
+      <div className="mb-6 text-center print:mb-8">
         <BrandLogo className="mx-auto mb-3 h-[83px] w-auto object-contain print:mb-1 print:h-11" />
         <h1 className="text-xl font-bold text-slate-800 print:text-sm">รายงานผลการประเมินมาตรฐานหน่วยบริการปฐมภูมิ</h1>
         <p className="text-sm text-slate-500 print:text-[10px]">{standard.standardVersion.name}</p>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-x-6 gap-y-1 rounded-xl border border-slate-200 p-4 text-sm print:mb-0 print:gap-y-0 print:p-2 print:text-[9.5px]">
+      <div className="mb-6 grid grid-cols-2 gap-x-6 gap-y-1 rounded-xl border border-slate-200 p-4 text-sm print:mb-8 print:gap-y-0 print:p-2 print:text-[9.5px]">
         <p>
           <span className="text-slate-500">หน่วยบริการ: </span>
           {facility?.name}
@@ -304,7 +308,7 @@ export default function Report() {
         </p>
       </div>
 
-      <div className={printMode === 'detailed' ? 'hidden' : ''}>
+      <div className={printMode === 'detailed' ? 'hidden' : 'print:mb-8'}>
         {standard.categories.map((cat) => {
           const catTopics = [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
           const catTotal = catTopics.reduce((sum, t) => sum + (aggregates.get(t.id)?.avgScore ?? 0), 0)
@@ -361,40 +365,51 @@ export default function Report() {
                 <div className="flex flex-col gap-4">
                   {catTopics.map((t) => {
                     const agg = aggregates.get(t.id)
-                    const topicPhotos = photosByTopic.get(t.id) ?? []
-                    const commentLines: string[] = []
-                    for (const s of agg?.scores ?? []) {
-                      const name = evaluatorNameById.get(s.participant_id) ?? 'กรรมการ'
-                      if (s.comment) commentLines.push(`${name}: ${s.comment}`)
-                      for (const [itemId, note] of Object.entries(s.item_notes ?? {})) {
-                        if (note.comment) commentLines.push(`${name} (${itemTextById.get(itemId) ?? itemId}): ${note.comment}`)
-                      }
-                    }
-                    if (commentLines.length === 0 && topicPhotos.length === 0) return null
+                    const generalLines = buildCommentLines(agg?.scores, evaluatorNameById, (s) => s.comment)
+                    const itemBlocks = t.scoreItems
+                      .map((item) => ({
+                        item,
+                        lines: buildCommentLines(agg?.scores, evaluatorNameById, (s) => s.item_notes?.[item.id]?.comment),
+                        itemPhotos: photosByTopicAndItem.get(t.id)?.get(item.id) ?? [],
+                      }))
+                      .filter((b) => b.lines.length > 0 || b.itemPhotos.length > 0)
+                    if (generalLines.length === 0 && itemBlocks.length === 0) return null
                     return (
                       <div key={t.id} className="break-inside-avoid rounded-lg border border-slate-200 p-3 text-sm">
-                        <p className="mb-1 font-semibold text-slate-800">
+                        <p className="mb-2 font-semibold text-slate-800">
                           <span className="font-mono text-xs text-slate-400">{t.code}</span> {t.name_th}
                         </p>
-                        {commentLines.length > 0 && (
-                          <ul className="mb-2 list-disc pl-5 text-slate-600">
-                            {commentLines.map((line, i) => (
+                        {generalLines.length > 0 && (
+                          <ul className="mb-2 list-none pl-0 text-slate-600">
+                            {generalLines.map((line, i) => (
                               <li key={i}>{line}</li>
                             ))}
                           </ul>
                         )}
-                        {topicPhotos.length > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            {topicPhotos.map((p) => (
-                              <img
-                                key={p.id}
-                                src={getTopicPhotoUrl(p.file_path)}
-                                alt={p.file_name ?? ''}
-                                className="h-20 w-20 rounded-md border border-slate-200 object-cover"
-                              />
-                            ))}
+                        {itemBlocks.map(({ item, lines, itemPhotos }) => (
+                          <div key={item.id} className="mb-2 last:mb-0">
+                            <p className="font-medium text-slate-700">{item.item_text}</p>
+                            {lines.length > 0 && (
+                              <ul className="list-none pl-0 text-slate-600">
+                                {lines.map((line, i) => (
+                                  <li key={i}>{line}</li>
+                                ))}
+                              </ul>
+                            )}
+                            {itemPhotos.length > 0 && (
+                              <div className="mt-1 flex flex-wrap gap-2">
+                                {itemPhotos.map((p) => (
+                                  <img
+                                    key={p.id}
+                                    src={getTopicPhotoUrl(p.file_path)}
+                                    alt={p.file_name ?? ''}
+                                    className="h-20 w-20 rounded-md border border-slate-200 object-cover"
+                                  />
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )}
+                        ))}
                       </div>
                     )
                   })}

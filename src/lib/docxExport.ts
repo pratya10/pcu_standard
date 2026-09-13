@@ -28,7 +28,7 @@ export type ReportDocxInput = {
   grandTotal: number
   mustFailCount: number
   includeComments?: boolean
-  photosByTopic?: Map<string, TopicPhoto[]>
+  photosByTopicAndItem?: Map<string, Map<string, TopicPhoto[]>>
 }
 
 // Caps how many photos get embedded per topic / for the whole document, so a
@@ -111,12 +111,18 @@ function categoryTopics(cat: FullStandard['categories'][number]): TopicWithEvide
   return [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
 }
 
-function commentCell(lines: string[], images: LogoAsset[]) {
-  const paragraphs = lines.map(
-    (line) =>
-      new Paragraph({
-        children: [new TextRun({ text: line, italics: true, size: 20, color: '475569' })],
-      }),
+function commentCell(heading: string | null, lines: string[], images: LogoAsset[]) {
+  const paragraphs: Paragraph[] = []
+  if (heading) {
+    paragraphs.push(new Paragraph({ children: [new TextRun({ text: heading, bold: true, size: 20 })] }))
+  }
+  paragraphs.push(
+    ...lines.map(
+      (line) =>
+        new Paragraph({
+          children: [new TextRun({ text: line, italics: true, size: 20, color: '475569' })],
+        }),
+    ),
   )
   if (images.length) {
     paragraphs.push(
@@ -135,31 +141,30 @@ function commentCell(lines: string[], images: LogoAsset[]) {
   })
 }
 
-function buildCommentLines(agg: TopicAggregate | undefined, topic: TopicWithEvidence, evaluatorNameById: Map<string, string>): string[] {
+// "ความคิดเห็นที่ N : ... โดย ..." — one evaluator's comment per line, numbered
+// within its own group (general topic comments and each sub-item's comments
+// are numbered separately), with no extra status text.
+function buildCommentLines(
+  agg: TopicAggregate | undefined,
+  evaluatorNameById: Map<string, string>,
+  pick: (s: TopicAggregate['scores'][number]) => string | null | undefined,
+): string[] {
   if (!agg) return []
-  const itemTextById = new Map(topic.scoreItems.map((it) => [it.id, it.item_text]))
   const lines: string[] = []
+  let n = 0
   for (const s of agg.scores) {
+    const comment = pick(s)
+    if (!comment) continue
+    n++
     const name = evaluatorNameById.get(s.participant_id) ?? 'กรรมการ'
-    if (s.comment) lines.push(`${name}: ${s.comment}`)
-    for (const [itemId, note] of Object.entries(s.item_notes ?? {})) {
-      if (note.comment) {
-        const itemText = itemTextById.get(itemId) ?? itemId
-        lines.push(`${name} (${itemText}): ${note.comment}`)
-      }
-    }
+    lines.push(`ความคิดเห็นที่ ${n} : ${comment} โดย ${name}`)
   }
   return lines
 }
 
-async function fetchTopicPhotoAssets(
-  topic: TopicWithEvidence,
-  photosByTopic: Map<string, TopicPhoto[]> | undefined,
-  imagesLeftTotal: { count: number },
-): Promise<LogoAsset[]> {
-  const photos = (photosByTopic?.get(topic.id) ?? []).slice(0, MAX_IMAGES_PER_TOPIC)
+async function fetchPhotoAssets(photos: TopicPhoto[], imagesLeftTotal: { count: number }): Promise<LogoAsset[]> {
   const assets: LogoAsset[] = []
-  for (const p of photos) {
+  for (const p of photos.slice(0, MAX_IMAGES_PER_TOPIC)) {
     if (imagesLeftTotal.count <= 0) break
     const asset = await tryFetchImage(getTopicPhotoUrl(p.file_path))
     if (asset) {
@@ -171,7 +176,7 @@ async function fetchTopicPhotoAssets(
 }
 
 export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> {
-  const { round, facility, standard, aggregates, evaluators, grandTotal, mustFailCount, includeComments, photosByTopic } = input
+  const { round, facility, standard, aggregates, evaluators, grandTotal, mustFailCount, includeComments, photosByTopicAndItem } = input
   const evaluatorNameById = new Map(evaluators.map((e) => [e.id, e.name]))
   const imagesLeftTotal = { count: MAX_IMAGES_TOTAL }
   const logo = await tryFetchImage(getLogoUrl())
@@ -251,10 +256,17 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
         }),
       )
       if (includeComments) {
-        const commentLines = buildCommentLines(agg, t, evaluatorNameById)
-        const images = await fetchTopicPhotoAssets(t, photosByTopic, imagesLeftTotal)
-        if (commentLines.length || images.length) {
-          rows.push(new TableRow({ children: [commentCell(commentLines, images)] }))
+        const generalLines = buildCommentLines(agg, evaluatorNameById, (s) => s.comment)
+        if (generalLines.length) {
+          rows.push(new TableRow({ children: [commentCell(null, generalLines, [])] }))
+        }
+        for (const item of t.scoreItems) {
+          const itemLines = buildCommentLines(agg, evaluatorNameById, (s) => s.item_notes?.[item.id]?.comment)
+          const itemPhotos = photosByTopicAndItem?.get(t.id)?.get(item.id) ?? []
+          const images = await fetchPhotoAssets(itemPhotos, imagesLeftTotal)
+          if (itemLines.length || images.length) {
+            rows.push(new TableRow({ children: [commentCell(item.item_text, itemLines, images)] }))
+          }
         }
       }
     }
