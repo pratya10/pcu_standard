@@ -27,15 +27,48 @@ export type ReportDocxInput = {
   mustFailCount: number
 }
 
-async function tryFetchLogo(): Promise<Uint8Array | null> {
+type LogoAsset = {
+  data: Uint8Array
+  type: 'jpg' | 'png' | 'gif' | 'bmp'
+  width: number
+  height: number
+}
+
+const CONTENT_TYPE_MAP: Record<string, LogoAsset['type']> = {
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/bmp': 'bmp',
+}
+
+const TARGET_LOGO_WIDTH = 340 // px, ~30% larger than the previous fixed size
+
+async function tryFetchLogo(): Promise<LogoAsset | null> {
   try {
     const res = await fetch(getLogoUrl())
     if (!res.ok) return null
+    const type = CONTENT_TYPE_MAP[res.headers.get('content-type') ?? '']
+    // docx's ImageRun only embeds jpg/png/gif/bmp directly; skip anything
+    // else (e.g. webp, svg) rather than risk a corrupt/distorted embed.
+    if (!type) return null
+
     const buf = await res.arrayBuffer()
-    return new Uint8Array(buf)
+    const bitmap = await createImageBitmap(new Blob([buf]))
+    const { width, height } = bitmap
+    bitmap.close()
+    if (!width || !height) return null
+
+    return { data: new Uint8Array(buf), type, width, height }
   } catch {
     return null
   }
+}
+
+function scaledLogoSize(natural: { width: number; height: number }) {
+  const width = TARGET_LOGO_WIDTH
+  const height = Math.round((natural.height / natural.width) * width)
+  return { width, height }
 }
 
 function cell(text: string, opts: { bold?: boolean; width?: number; align?: (typeof AlignmentType)[keyof typeof AlignmentType] } = {}) {
@@ -78,7 +111,7 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
     children.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new ImageRun({ data: logo, transformation: { width: 260, height: 90 }, type: 'png' })],
+        children: [new ImageRun({ data: logo.data, transformation: scaledLogoSize(logo), type: logo.type })],
       }),
     )
   }

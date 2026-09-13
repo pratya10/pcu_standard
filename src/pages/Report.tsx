@@ -121,7 +121,7 @@ export default function Report() {
       </div>
 
       <div className="mb-6 text-center">
-        <BrandLogo className="mx-auto mb-3 h-16 w-auto object-contain" />
+        <BrandLogo className="mx-auto mb-3 h-[83px] w-auto object-contain" />
         <h1 className="text-xl font-bold text-slate-800">รายงานผลการประเมินมาตรฐานหน่วยบริการปฐมภูมิ</h1>
         <p className="text-sm text-slate-500">{standard.standardVersion.name}</p>
       </div>
