@@ -20,6 +20,9 @@ export default function AdminNav({ title }: { title: string }) {
         <Link to="/admin/facilities" className="text-slate-500 hover:text-slate-800">
           หน่วยบริการ
         </Link>
+        <Link to="/admin/settings" className="text-slate-500 hover:text-slate-800">
+          ตั้งค่าโลโก้
+        </Link>
         <button onClick={logout} className="text-red-500 hover:text-red-700">
           ออกจากระบบ
         </button>

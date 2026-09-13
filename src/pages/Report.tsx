@@ -5,6 +5,8 @@ import { loadStandardByVersionId, allTopicsFlat } from '../lib/loadStandard'
 import { fetchScoresForRound } from '../lib/scoresApi'
 import { aggregateAll, formatAvg } from '../lib/aggregate'
 import type { AssessmentRound, FullStandard, Facility, Participant, Score } from '../types'
+import BrandLogo from '../components/BrandLogo'
+import { downloadBlob, generateReportDocx } from '../lib/docxExport'
 
 export default function Report() {
   const { roundId } = useParams<{ roundId: string }>()
@@ -44,6 +46,26 @@ export default function Report() {
   const flatTopics = useMemo(() => (standard ? allTopicsFlat(standard) : []), [standard])
   const aggregates = useMemo(() => aggregateAll(flatTopics.map((t) => t.id), scores), [flatTopics, scores])
   const evaluators = participants.filter((p) => p.role !== 'viewer')
+  const [exportingDocx, setExportingDocx] = useState(false)
+
+  async function exportDocx() {
+    if (!standard || !round) return
+    setExportingDocx(true)
+    try {
+      const blob = await generateReportDocx({
+        round,
+        facility,
+        standard,
+        aggregates,
+        evaluators,
+        grandTotal: flatTopics.reduce((sum, t) => sum + (aggregates.get(t.id)?.avgScore ?? 0), 0),
+        mustFailCount: flatTopics.filter((t) => aggregates.get(t.id)?.mustPassFinal === false).length,
+      })
+      downloadBlob(blob, `pcu-report-${round.join_code}.docx`)
+    } finally {
+      setExportingDocx(false)
+    }
+  }
 
   function exportCsv() {
     if (!standard) return
@@ -86,12 +108,20 @@ export default function Report() {
         <button onClick={exportCsv} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600">
           ดาวน์โหลด CSV
         </button>
+        <button
+          onClick={exportDocx}
+          disabled={exportingDocx}
+          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
+        >
+          {exportingDocx ? 'กำลังสร้างไฟล์...' : 'ดาวน์โหลด Word (.docx)'}
+        </button>
         <button onClick={() => window.print()} className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white">
           พิมพ์ / บันทึกเป็น PDF
         </button>
       </div>
 
       <div className="mb-6 text-center">
+        <BrandLogo className="mx-auto mb-3 h-16 w-auto object-contain" />
         <h1 className="text-xl font-bold text-slate-800">รายงานผลการประเมินมาตรฐานหน่วยบริการปฐมภูมิ</h1>
         <p className="text-sm text-slate-500">{standard.standardVersion.name}</p>
       </div>

@@ -19,6 +19,7 @@ export default function AdminFacilities() {
   const [facilities, setFacilities] = useState<Facility[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState(emptyForm)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -33,6 +34,29 @@ export default function AdminFacilities() {
     load()
   }, [])
 
+  function startEdit(f: Facility) {
+    setEditingId(f.id)
+    setForm({
+      code: f.code ?? '',
+      name: f.name,
+      facility_type: f.facility_type ?? 'รพ.สต.',
+      affiliation: f.affiliation ?? '',
+      district: f.district ?? '',
+      province: f.province ?? '',
+      cup_hospital: f.cup_hospital ?? '',
+      address: f.address ?? '',
+      contact: f.contact ?? '',
+    })
+    setError(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setForm(emptyForm)
+    setError(null)
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.name.trim()) {
@@ -41,16 +65,32 @@ export default function AdminFacilities() {
     }
     setSaving(true)
     setError(null)
-    const { error } = await supabase.from('facilities').insert({
-      ...form,
-      code: form.code.trim() || null,
-    })
+    const payload = { ...form, code: form.code.trim() || null }
+    const { error } = editingId
+      ? await supabase.from('facilities').update(payload).eq('id', editingId)
+      : await supabase.from('facilities').insert(payload)
     setSaving(false)
     if (error) {
       setError('บันทึกไม่สำเร็จ: ' + error.message)
       return
     }
     setForm(emptyForm)
+    setEditingId(null)
+    load()
+  }
+
+  async function handleDelete(f: Facility) {
+    if (!confirm(`ลบหน่วยบริการ "${f.name}" ออกจากระบบ?`)) return
+    const { error } = await supabase.from('facilities').delete().eq('id', f.id)
+    if (error) {
+      alert(
+        error.code === '23503'
+          ? 'ลบไม่ได้ เพราะหน่วยบริการนี้มีรอบการประเมินผูกอยู่แล้ว กรุณาลบรอบการประเมินที่เกี่ยวข้องก่อน'
+          : 'ลบไม่สำเร็จ: ' + error.message,
+      )
+      return
+    }
+    if (editingId === f.id) cancelEdit()
     load()
   }
 
@@ -59,6 +99,11 @@ export default function AdminFacilities() {
       <AdminNav title="จัดการหน่วยบริการ (PCU)" />
 
       <form onSubmit={handleSubmit} className="mb-8 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4">
+        {editingId && (
+          <p className="col-span-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">
+            กำลังแก้ไข: {facilities.find((f) => f.id === editingId)?.name}
+          </p>
+        )}
         <input
           placeholder="รหัสหน่วยบริการ 5 หลัก"
           value={form.code}
@@ -118,13 +163,24 @@ export default function AdminFacilities() {
           className="col-span-2 rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
         {error && <p className="col-span-2 text-sm text-red-600">{error}</p>}
-        <button
-          type="submit"
-          disabled={saving}
-          className="col-span-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {saving ? 'กำลังบันทึก...' : '+ เพิ่มหน่วยบริการ'}
-        </button>
+        <div className="col-span-2 flex gap-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {saving ? 'กำลังบันทึก...' : editingId ? 'บันทึกการแก้ไข' : '+ เพิ่มหน่วยบริการ'}
+          </button>
+          {editingId && (
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600"
+            >
+              ยกเลิก
+            </button>
+          )}
+        </div>
       </form>
 
       {loading ? (
@@ -139,6 +195,7 @@ export default function AdminFacilities() {
                 <th className="px-3 py-2">ประเภท</th>
                 <th className="px-3 py-2">อำเภอ/จังหวัด</th>
                 <th className="px-3 py-2">CUP</th>
+                <th className="px-3 py-2"></th>
               </tr>
             </thead>
             <tbody>
@@ -151,11 +208,19 @@ export default function AdminFacilities() {
                     {f.district} {f.province}
                   </td>
                   <td className="px-3 py-2">{f.cup_hospital}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <button onClick={() => startEdit(f)} className="mr-3 text-xs text-emerald-700 hover:underline">
+                      แก้ไข
+                    </button>
+                    <button onClick={() => handleDelete(f)} className="text-xs text-red-500 hover:underline">
+                      ลบ
+                    </button>
+                  </td>
                 </tr>
               ))}
               {facilities.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-slate-400">
+                  <td colSpan={6} className="px-3 py-6 text-center text-slate-400">
                     ยังไม่มีหน่วยบริการ
                   </td>
                 </tr>

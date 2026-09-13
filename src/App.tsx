@@ -6,6 +6,7 @@ import AdminDashboard from './pages/AdminDashboard'
 import AdminRoundDetail from './pages/AdminRoundDetail'
 import AdminNewRound from './pages/AdminNewRound'
 import AdminFacilities from './pages/AdminFacilities'
+import AdminSettings from './pages/AdminSettings'
 import ScoreForm from './pages/ScoreForm'
 import LiveDashboard from './pages/LiveDashboard'
 import Report from './pages/Report'
@@ -32,6 +33,14 @@ export default function App() {
           element={
             <RequireAdmin>
               <AdminFacilities />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/admin/settings"
+          element={
+            <RequireAdmin>
+              <AdminSettings />
             </RequireAdmin>
           }
         />
