@@ -5,6 +5,7 @@ import { randomDeviceKey, saveParticipantSession } from '../lib/participantSessi
 import { searchCommitteeMembers, updateCommitteeMember } from '../lib/committeeSearch'
 import { useConfirm } from '../components/ConfirmProvider'
 import VersionFooter from '../components/VersionFooter'
+import BrandLogo from '../components/BrandLogo'
 import type { CommitteeMember, ParticipantRole } from '../types'
 
 function DiffRow({ label, oldValue, newValue }: { label: string; oldValue: string; newValue: string }) {
@@ -188,6 +189,7 @@ export default function Join() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
+      <BrandLogo className="mx-auto mb-4 h-16 w-auto object-contain" />
       <h1 className="mb-6 text-center text-2xl font-bold text-slate-800">เข้าร่วมรอบการประเมิน</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
         <div>
