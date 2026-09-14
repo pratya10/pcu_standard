@@ -431,7 +431,7 @@ export default function Report() {
                       <Fragment key={t.id}>
                         <tr className="border-b border-dotted border-slate-400">
                           <td className={`py-1 pr-2 ${compact ? 'print:py-0' : 'print:py-1'}`}>
-                            <span className={`font-mono text-xs text-slate-400 ${compact ? 'print:text-[7px]' : 'print:text-[10px]'}`}>{t.code}</span>{' '}
+                            <span className={`font-mono text-xs text-[#2E74B5] ${compact ? 'print:text-[7px]' : 'print:text-[10px]'}`}>{t.code}</span>{' '}
                             {t.name_th}
                           </td>
                           <td className={`w-[17%] py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>
