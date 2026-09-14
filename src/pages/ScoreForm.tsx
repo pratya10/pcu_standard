@@ -519,7 +519,7 @@ export default function ScoreForm() {
 
   return (
     <div className="flex w-full gap-4 px-4 py-6 pb-20">
-      <nav className="sticky top-4 hidden h-fit w-52 shrink-0 flex-col gap-1 rounded-xl border border-slate-200 bg-white p-3 md:flex">
+      <nav className="sticky top-4 hidden h-fit max-h-[calc(100vh-2rem)] w-52 shrink-0 flex-col gap-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3 md:flex">
         {navList}
       </nav>
 
