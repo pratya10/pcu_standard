@@ -456,7 +456,7 @@ function getScoreDescriptions(topic: TopicWithEvidence): Record<'0' | '1' | '2',
 
 function StatusBadge({ answered, isNa, score }: { answered: boolean; isNa: boolean; score: ScoreValue | null }) {
   if (!answered) return null
-  if (isNa) return <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-600">N/A</span>
+  if (isNa) return <span className="whitespace-nowrap rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-600">N/A</span>
   const color = score === 2 ? 'bg-emerald-100 text-emerald-700' : score === 1 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
-  return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>{score} คะแนน</span>
+  return <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold ${color}`}>{score} คะแนน</span>
 }

@@ -554,11 +554,13 @@ export default function ScoreForm() {
             >
               ☰ หมวดหมู่
             </button>
-            <h1 className="min-w-0 flex-1 truncate text-lg font-bold text-slate-800">{round.name}</h1>
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-lg font-bold text-slate-800">{round.name}</h1>
+              <p className="mt-0.5 truncate text-xs text-slate-400">
+                {facility?.name ?? '-'} · {formatThaiDate(round.survey_date, 'ยังไม่กำหนดวัน')}
+              </p>
+            </div>
           </div>
-          <p className="mt-0.5 truncate text-xs text-slate-400">
-            {facility?.name ?? '-'} · {formatThaiDate(round.survey_date, 'ยังไม่กำหนดวัน')}
-          </p>
           <div className="mt-2 flex items-center justify-between text-sm">
             <span className="text-slate-500">
               {session.name} · {session.role === 'evaluator' ? 'กรรมการประเมิน' : session.role === 'viewer' ? 'ผู้สังเกตการณ์' : session.role}
