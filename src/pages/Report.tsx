@@ -114,6 +114,8 @@ export default function Report() {
   const [loading, setLoading] = useState(true)
   const [printMode, setPrintMode] = useState<'summary' | 'detailed'>('summary')
   const [showAuditLog, setShowAuditLog] = useState(false)
+  const [lightboxPhoto, setLightboxPhoto] = useState<TopicPhoto | null>(null)
+  const [lightboxZoomed, setLightboxZoomed] = useState(false)
   const printAreaRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -170,6 +172,26 @@ export default function Report() {
     window.addEventListener('afterprint', resetAfterPrint)
     return () => window.removeEventListener('afterprint', resetAfterPrint)
   }, [])
+
+  // The app pins the page at 1x zoom (maximum-scale=1.0) everywhere else so
+  // evaluators don't accidentally pinch-zoom the score form — but that same
+  // lock would defeat the point of a photo lightbox, so relax it only while
+  // one is open and put it back the moment it closes.
+  useEffect(() => {
+    if (!lightboxPhoto) return
+    const meta = document.querySelector('meta[name="viewport"]')
+    const original = meta?.getAttribute('content') ?? null
+    meta?.setAttribute('content', 'width=device-width, initial-scale=1.0')
+    // Also stop the page underneath from scrolling — otherwise a scroll or
+    // swipe meant to pan the (possibly small) zoomed image just falls
+    // through to the report behind it once there's nothing left to pan.
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      if (original !== null) meta?.setAttribute('content', original)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [lightboxPhoto])
 
   // The logo (and any evidence photos in the detailed report) are fetched
   // over the network, so without this the print dialog/PDF can capture the
@@ -450,30 +472,34 @@ export default function Report() {
                                   <p className="text-[11px] font-semibold text-slate-500">{ITEM_LEVEL_LABEL[level]}</p>
                                   <div className="ml-1 space-y-1.5 border-l-2 border-slate-200 pl-2 pt-1">
                                     {items.map(({ item, detail, itemPhotos }) => (
-                                      <div key={item.id}>
-                                        <div className="flex items-center gap-2">
-                                          {detail.checkedFinal !== null && <ItemCheckedBadge checked={detail.checkedFinal} />}
+                                      <div key={item.id} className="flex items-start gap-2">
+                                        {detail.checkedFinal !== null && <ItemCheckedBadge checked={detail.checkedFinal} />}
+                                        <div className="min-w-0 flex-1">
                                           <p className="font-medium text-slate-700">{item.item_text}</p>
+                                          {detail.comments.length > 0 && (
+                                            <div className="mt-1 space-y-1.5 rounded-md border border-slate-200 bg-white p-2">
+                                              {detail.comments.map((e, i) => (
+                                                <CommentLine key={i} entry={e} />
+                                              ))}
+                                            </div>
+                                          )}
+                                          {itemPhotos.length > 0 && (
+                                            <div className="mt-1 flex flex-wrap gap-2">
+                                              {itemPhotos.map((p) => (
+                                                <img
+                                                  key={p.id}
+                                                  src={getTopicPhotoUrl(p.file_path)}
+                                                  alt={p.file_name ?? ''}
+                                                  className="h-20 w-20 cursor-zoom-in rounded-md border border-slate-200 object-cover"
+                                                  onClick={() => {
+                                                    setLightboxPhoto(p)
+                                                    setLightboxZoomed(false)
+                                                  }}
+                                                />
+                                              ))}
+                                            </div>
+                                          )}
                                         </div>
-                                        {detail.comments.length > 0 && (
-                                          <div className="mt-0.5 space-y-1 pl-1">
-                                            {detail.comments.map((e, i) => (
-                                              <CommentLine key={i} entry={e} />
-                                            ))}
-                                          </div>
-                                        )}
-                                        {itemPhotos.length > 0 && (
-                                          <div className="mt-1 flex flex-wrap gap-2">
-                                            {itemPhotos.map((p) => (
-                                              <img
-                                                key={p.id}
-                                                src={getTopicPhotoUrl(p.file_path)}
-                                                alt={p.file_name ?? ''}
-                                                className="h-20 w-20 rounded-md border border-slate-200 object-cover"
-                                              />
-                                            ))}
-                                          </div>
-                                        )}
                                       </div>
                                     ))}
                                   </div>
@@ -537,6 +563,29 @@ export default function Report() {
           </div>
         </div>
       </div>
+
+      {lightboxPhoto && (
+        <div
+          className="no-print fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+          onClick={() => setLightboxPhoto(null)}
+        >
+          <button
+            type="button"
+            onClick={() => setLightboxPhoto(null)}
+            className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xl text-white"
+          >
+            ×
+          </button>
+          <div className={lightboxZoomed ? 'h-full w-full overflow-auto' : 'flex h-full w-full items-center justify-center p-4'} onClick={(e) => e.stopPropagation()}>
+            <img
+              src={getTopicPhotoUrl(lightboxPhoto.file_path)}
+              alt={lightboxPhoto.file_name ?? ''}
+              onClick={() => setLightboxZoomed((z) => !z)}
+              className={lightboxZoomed ? 'w-auto max-w-none cursor-zoom-out' : 'max-h-full max-w-full cursor-zoom-in object-contain'}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
