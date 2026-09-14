@@ -7,6 +7,7 @@ import {
   listTopicPhotos,
   MAX_PHOTOS_PER_ITEM,
   MAX_PHOTO_BYTES,
+  replaceTopicPhoto,
   uploadTopicPhoto,
 } from '../lib/topicPhotos'
 import { logTeamScoreOverwrite, parseTeamComments, serializeTeamComments, upsertTeamScore, type TeamScoreDraft } from '../lib/teamScoresApi'
@@ -75,6 +76,7 @@ export default function TeamTopicScoreCard({
 
   const [photos, setPhotos] = useState<TopicPhoto[]>([])
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null)
+  const [replacingPhotoId, setReplacingPhotoId] = useState<string | null>(null)
   const [photoError, setPhotoError] = useState<string | null>(null)
 
   const score = teamScore?.score ?? null
@@ -287,6 +289,29 @@ export default function TeamTopicScoreCard({
     setPhotos((prev) => prev.filter((p) => p.id !== photo.id))
   }
 
+  // Same idea as editing a comment in place: the original uploader can swap
+  // the file behind their own photo, no confirmation needed since it's their
+  // own attachment and nothing else about it (position, item) changes.
+  async function handleReplacePhoto(photo: TopicPhoto, e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setPhotoError(null)
+    if (file.size > MAX_PHOTO_BYTES) {
+      setPhotoError('ไฟล์รูปภาพต้องมีขนาดไม่เกิน 30 MB')
+      return
+    }
+    setReplacingPhotoId(photo.id)
+    try {
+      const updated = await replaceTopicPhoto(photo, file)
+      setPhotos((prev) => prev.map((p) => (p.id === photo.id ? updated : p)))
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'แก้ไขรูปไม่สำเร็จ')
+    } finally {
+      setReplacingPhotoId(null)
+    }
+  }
+
   function toggleCommentBox(itemId: string) {
     setOpenComments((prev) => {
       const next = new Set(prev)
@@ -413,7 +438,19 @@ export default function TeamTopicScoreCard({
                     {itemPhotos.map((p) => (
                       <div key={p.id} className="group relative h-14 w-14 overflow-hidden rounded-md border border-slate-200">
                         <img src={getTopicPhotoUrl(p.file_path)} alt={p.file_name ?? ''} className="h-full w-full object-cover" />
-                        {!readOnly && (
+                        {replacingPhotoId === p.id && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-[10px] text-white">...</div>
+                        )}
+                        {!readOnly && p.uploaded_by === participantId && (
+                          <label
+                            title="แก้ไขรูปภาพ"
+                            className="absolute bottom-0 left-0 flex cursor-pointer items-center rounded-tr bg-black/60 px-1 text-[10px] text-white"
+                          >
+                            <Icon name="edit" className="!text-xs" />
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleReplacePhoto(p, e)} />
+                          </label>
+                        )}
+                        {isAdmin && (
                           <button
                             type="button"
                             onClick={() => handleDeletePhoto(p)}

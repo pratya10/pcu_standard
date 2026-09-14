@@ -299,6 +299,14 @@ export default function Report() {
           <Link to="/admin" className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600">
             ไปหน้าแอดมิน
           </Link>
+          {round.scoring_mode === 'collaborative' && auditLog.length > 0 && (
+            <button
+              onClick={() => setShowAuditLog((v) => !v)}
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600"
+            >
+              {showAuditLog ? 'ซ่อนประวัติการแก้ไข' : 'ดูประวัติการแก้ไข'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -343,18 +351,6 @@ export default function Report() {
             </button>
           </div>
         </div>
-
-        {round.scoring_mode === 'collaborative' && auditLog.length > 0 && (
-          <div className="rounded-xl border border-slate-200 p-3">
-            <p className="mb-2 text-xs font-semibold text-slate-400">ประวัติการแก้ไข (ทีมคณะกรรมช่วยกัน)</p>
-            <button
-              onClick={() => setShowAuditLog((v) => !v)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600"
-            >
-              {showAuditLog ? 'ซ่อนประวัติการแก้ไข' : 'ดูประวัติการแก้ไข'}
-            </button>
-          </div>
-        )}
       </div>
 
       <div className="mb-6 text-center print:mb-8">
@@ -365,21 +361,21 @@ export default function Report() {
 
       <table className="mb-6 w-full border-collapse text-sm print:mb-8 print:text-[9.5px]">
         <tbody>
-          <tr className="border-b border-dotted border-slate-400">
+          <tr className="border-b border-dotted border-slate-300">
             <td className="w-[28%] py-1 pr-2 align-top font-semibold text-slate-700">หน่วยบริการ</td>
             <td className="py-1">{facility?.name}</td>
           </tr>
-          <tr className="border-b border-dotted border-slate-400">
+          <tr className="border-b border-dotted border-slate-300">
             <td className="py-1 pr-2 align-top font-semibold text-slate-700">รหัสหน่วยบริการปฐมภูมิ</td>
             <td className="py-1">
               {facility?.pcu_code ?? '-'} ( รหัสสถานพยาบาล {facility?.code ?? '-'} )
             </td>
           </tr>
-          <tr className="border-b border-dotted border-slate-400">
+          <tr className="border-b border-dotted border-slate-300">
             <td className="py-1 pr-2 align-top font-semibold text-slate-700">รอบการประเมิน</td>
             <td className="py-1">{round.name}</td>
           </tr>
-          <tr className="border-b border-dotted border-slate-400">
+          <tr className="border-b border-dotted border-slate-300">
             <td className="py-1 pr-2 align-top font-semibold text-slate-700">วันที่ประเมิน</td>
             <td className="py-1">{formatThaiDate(round.survey_date)}</td>
           </tr>
@@ -403,7 +399,7 @@ export default function Report() {
               </h2>
               <table className={`w-full border-collapse text-sm ${compact ? 'print:text-[7.5px] print:leading-tight' : 'print:text-xs'}`}>
                 <thead>
-                  <tr className={`border-b border-dotted border-slate-400 text-left text-xs text-slate-500 ${compact ? 'print:text-[7px]' : 'print:text-[11px]'}`}>
+                  <tr className={`border-b border-dotted border-slate-300 text-left text-xs text-slate-800 ${compact ? 'print:text-[7px]' : 'print:text-[11px]'}`}>
                     <th className={`py-1 pr-2 ${compact ? 'print:py-0' : 'print:py-1'}`}>หัวข้อ</th>
                     <th className={`w-[17%] py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>มาตรฐานพื้นฐาน</th>
                     <th className={`w-[17%] py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>การพัฒนาต่อเนื่อง</th>
@@ -429,7 +425,7 @@ export default function Report() {
                     const hasDetail = generalEntries.length > 0 || levelGroups.length > 0
                     return (
                       <Fragment key={t.id}>
-                        <tr className="border-b border-dotted border-slate-400">
+                        <tr className="border-b border-dotted border-slate-300">
                           <td className={`py-1 pr-2 ${compact ? 'print:py-0' : 'print:py-1'}`}>
                             <span className={`font-mono text-xs text-[#2E74B5] ${compact ? 'print:text-[7px]' : 'print:text-[10px]'}`}>{t.code}</span>{' '}
                             {t.name_th}
@@ -440,7 +436,7 @@ export default function Report() {
                           <td className={`w-[17%] py-1 pr-2 text-center font-semibold ${compact ? 'print:py-0' : 'print:py-1'}`}>{formatAvg(agg?.avgScore ?? null)}</td>
                         </tr>
                         {hasDetail && (
-                          <tr className="break-inside-avoid border-b border-dotted border-slate-400">
+                          <tr className="break-inside-avoid border-b border-dotted border-slate-300">
                             <td colSpan={3} className="bg-slate-50 px-3 py-2 align-top text-xs text-slate-600 print:text-[11px]">
                               {generalEntries.length > 0 && (
                                 <div className="mb-1.5 space-y-0.5 last:mb-0">

@@ -124,9 +124,21 @@ function categoryTopics(cat: FullStandard['categories'][number]): TopicWithEvide
   return [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
 }
 
-function commentCell(heading: string | null, lines: string[], images: LogoAsset[]) {
+function commentCell(heading: string | null, lines: string[], images: LogoAsset[], checked?: boolean | null) {
   const paragraphs: Paragraph[] = []
-  if (heading) {
+  if (checked !== undefined && checked !== null) {
+    // Same green/red pill the web page uses for a sub-item's ใช่/ไม่ result —
+    // docx has no rounded-corner shading, so a plain colored highlight
+    // behind bold white text is the closest equivalent.
+    paragraphs.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: checked ? ' ใช่ ' : ' ไม่ ', bold: true, color: 'FFFFFF', shading: { fill: checked ? '10B981' : 'F87171' } }),
+          ...(heading ? [new TextRun({ text: `  ${heading}`, bold: true, size: 20 })] : []),
+        ],
+      }),
+    )
+  } else if (heading) {
     paragraphs.push(new Paragraph({ children: [new TextRun({ text: heading, bold: true, size: 20 })] }))
   }
   paragraphs.push(
@@ -173,6 +185,20 @@ function buildCommentLines(
     lines.push(`ความคิดเห็นที่ ${n} : ${comment} โดย ${name}`)
   }
   return lines
+}
+
+// Majority vote across whoever touched this item — same rule aggregate.ts
+// uses for a topic's overall Must result — since average mode can have
+// several evaluators' own checked states for one item.
+function itemCheckedFinal(agg: TopicAggregate | undefined, itemId: string): boolean | null {
+  if (!agg) return null
+  const checks: boolean[] = []
+  for (const s of agg.scores) {
+    const note = s.item_notes?.[itemId]
+    if (!note) continue
+    checks.push(note.checked)
+  }
+  return checks.length === 0 ? null : checks.filter(Boolean).length / checks.length >= 0.5
 }
 
 async function fetchPhotoAssets(photos: TopicPhoto[], imagesLeftTotal: { count: number }): Promise<LogoAsset[]> {
@@ -283,8 +309,9 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
           const itemLines = buildCommentLines(agg, evaluatorNameById, (s) => s.item_notes?.[item.id]?.comment)
           const itemPhotos = photosByTopicAndItem?.get(t.id)?.get(item.id) ?? []
           const images = await fetchPhotoAssets(itemPhotos, imagesLeftTotal)
-          if (itemLines.length || images.length) {
-            rows.push(new TableRow({ children: [commentCell(item.item_text, itemLines, images)] }))
+          const checked = itemCheckedFinal(agg, item.id)
+          if (itemLines.length || images.length || checked !== null) {
+            rows.push(new TableRow({ children: [commentCell(item.item_text, itemLines, images, checked)] }))
           }
         }
       }
