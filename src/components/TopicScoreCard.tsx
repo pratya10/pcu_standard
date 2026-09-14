@@ -106,14 +106,14 @@ export default function TopicScoreCard({
   }
 
   function setItemChecked(itemId: string, checked: boolean) {
-    const current = itemNotes[itemId] ?? { checked: false, comment: '' }
+    const current = itemNotes[itemId] ?? { checked: null, comment: '' }
     const next = { ...itemNotes, [itemId]: { ...current, checked } }
     setItemNotes(next)
     save({ itemNotes: next })
   }
 
   function updateItemComment(itemId: string, text: string) {
-    const current = itemNotes[itemId] ?? { checked: false, comment: '' }
+    const current = itemNotes[itemId] ?? { checked: null, comment: '' }
     const next = { ...itemNotes, [itemId]: { ...current, comment: text } }
     setItemNotes(next)
   }
@@ -171,14 +171,14 @@ export default function TopicScoreCard({
       <div className="flex flex-col gap-2">
         {items.map((item) => {
           const note = itemNotes[item.id]
-          const checked = note?.checked ?? false
+          const checked = note?.checked ?? null
           const commentOpen = openComments.has(item.id)
           const itemPhotos = photosByItem.get(item.id) ?? []
           const hasNote = !!note?.comment || itemPhotos.length > 0
           return (
             <div key={item.id} className="rounded-md bg-slate-50 px-2 py-2">
               <div className="flex items-center gap-2">
-                <ToggleSwitch checked={checked} disabled={readOnly} onChange={(v) => setItemChecked(item.id, v)} />
+                <YesNoButtons checked={checked} disabled={readOnly} onChange={(v) => setItemChecked(item.id, v)} />
                 <span className="flex-1 text-slate-700">{item.item_text}</span>
                 <button
                   type="button"
@@ -419,18 +419,30 @@ export default function TopicScoreCard({
   )
 }
 
-function ToggleSwitch({ checked, disabled, onChange }: { checked: boolean; disabled: boolean; onChange: (v: boolean) => void }) {
+function YesNoButtons({ checked, disabled, onChange }: { checked: boolean | null; disabled: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`shrink-0 rounded-full px-3.5 py-2 text-sm font-bold text-white transition-colors ${
-        checked ? 'bg-emerald-500' : 'bg-red-400'
-      } disabled:opacity-60`}
-    >
-      {checked ? 'ใช่' : 'ไม่'}
-    </button>
+    <div className="flex shrink-0 gap-1.5">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onChange(true)}
+        className={`rounded-full px-4 py-2.5 text-sm font-bold transition-colors ${
+          checked === true ? 'bg-emerald-500 text-white' : 'border-2 border-slate-300 text-slate-400'
+        } disabled:opacity-60`}
+      >
+        ใช่
+      </button>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onChange(false)}
+        className={`rounded-full px-4 py-2.5 text-sm font-bold transition-colors ${
+          checked === false ? 'bg-red-400 text-white' : 'border-2 border-slate-300 text-slate-400'
+        } disabled:opacity-60`}
+      >
+        ไม่ใช่
+      </button>
+    </div>
   )
 }
 

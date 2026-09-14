@@ -13,6 +13,7 @@ import {
 import { logTeamScoreOverwrite, parseTeamComments, serializeTeamComments, upsertTeamScore, type TeamScoreDraft } from '../lib/teamScoresApi'
 import { useConfirm } from './ConfirmProvider'
 import Icon from './Icon'
+import PhotoLightbox from './PhotoLightbox'
 
 type TopicWithEvidence = Topic & { evidence: TopicEvidenceItem[]; scoreItems: TopicScoreItem[] }
 type LevelKey = '-2' | '-1' | '0' | '1' | '2'
@@ -78,6 +79,7 @@ export default function TeamTopicScoreCard({
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null)
   const [replacingPhotoId, setReplacingPhotoId] = useState<string | null>(null)
   const [photoError, setPhotoError] = useState<string | null>(null)
+  const [lightboxPhoto, setLightboxPhoto] = useState<TopicPhoto | null>(null)
 
   const score = teamScore?.score ?? null
   const isNa = teamScore?.is_na ?? false
@@ -169,10 +171,10 @@ export default function TeamTopicScoreCard({
   async function applyItemChecked(itemId: string, checked: boolean) {
     if (readOnly) return
     const current = itemNotes[itemId]
-    if (current && current.checked !== checked) {
+    if (current && current.checked !== null && current.checked !== checked) {
       const ok = await confirm({
         title: 'ยืนยันเปลี่ยนค่า',
-        message: `ข้อนี้ถูกตั้งไว้แล้วว่า "${current.checked ? 'ใช่' : 'ไม่'}" โดย ${editorName(current.checkedBy)}\nต้องการเปลี่ยนเป็น "${checked ? 'ใช่' : 'ไม่'}" หรือไม่?`,
+        message: `ข้อนี้ถูกตั้งไว้แล้วว่า "${current.checked ? 'ใช่' : 'ไม่ใช่'}" โดย ${editorName(current.checkedBy)}\nต้องการเปลี่ยนเป็น "${checked ? 'ใช่' : 'ไม่ใช่'}" หรือไม่?`,
         confirmLabel: 'ยืนยันเปลี่ยน',
       })
       if (!ok) return
@@ -202,7 +204,7 @@ export default function TeamTopicScoreCard({
     const nextComments = editingId
       ? existingComments.map((c) => (c.id === editingId ? { ...c, text } : c))
       : [...existingComments, { id: crypto.randomUUID(), authorId: participantId, author: participantName, text, createdAt: new Date().toISOString() }]
-    const next = { ...itemNotes, [itemId]: { checked: current?.checked ?? false, checkedBy: current?.checkedBy, comments: nextComments } }
+    const next = { ...itemNotes, [itemId]: { checked: current?.checked ?? null, checkedBy: current?.checkedBy, comments: nextComments } }
     setNewComment((prev) => ({ ...prev, [itemId]: '' }))
     setEditingItemCommentId((prev) => ({ ...prev, [itemId]: null }))
     await persist({ itemNotes: next })
@@ -223,7 +225,7 @@ export default function TeamTopicScoreCard({
     if (!ok) return
     const current = itemNotes[itemId]
     const nextComments = getNoteComments(current).filter((c) => c.id !== commentId)
-    const next = { ...itemNotes, [itemId]: { checked: current?.checked ?? false, checkedBy: current?.checkedBy, comments: nextComments } }
+    const next = { ...itemNotes, [itemId]: { checked: current?.checked ?? null, checkedBy: current?.checkedBy, comments: nextComments } }
     if (editingItemCommentId[itemId] === commentId) cancelEditItemComment(itemId)
     await persist({ itemNotes: next })
   }
@@ -329,7 +331,7 @@ export default function TeamTopicScoreCard({
       <div className="flex flex-col gap-2">
         {items.map((item) => {
           const note = itemNotes[item.id]
-          const checked = note?.checked ?? false
+          const checked = note?.checked ?? null
           const commentOpen = openComments.has(item.id)
           const itemPhotos = photosByItem.get(item.id) ?? []
           const noteComments = getNoteComments(note)
@@ -337,29 +339,33 @@ export default function TeamTopicScoreCard({
           const editingId = editingItemCommentId[item.id]
           return (
             <div key={item.id} className="rounded-md bg-slate-50 px-2 py-2">
-              <div className="flex items-center gap-2">
-                <ToggleSwitch checked={checked} disabled={readOnly} onChange={(v) => applyItemChecked(item.id, v)} />
-                <span className="flex-1 text-slate-700">{item.item_text}</span>
-                <button
-                  type="button"
-                  title="แนบรูปภาพ/คอมเมนต์"
-                  onClick={() => toggleCommentBox(item.id)}
-                  className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
-                    commentOpen || hasNote ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
-                  }`}
-                >
-                  <Icon name="add_comment" className="!text-sm" />
-                  {noteComments.length > 0 ? noteComments.length : ''}
-                  <Icon name="add_a_photo" className="!text-sm" />
-                  {itemPhotos.length > 0 ? itemPhotos.length : ''}
-                </button>
+              <div className="flex items-start gap-2">
+                <YesNoButtons checked={checked} disabled={readOnly} onChange={(v) => applyItemChecked(item.id, v)} />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1 text-slate-700">{item.item_text}</span>
+                    <button
+                      type="button"
+                      title="แนบรูปภาพ/คอมเมนต์"
+                      onClick={() => toggleCommentBox(item.id)}
+                      className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
+                        commentOpen || hasNote ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
+                      }`}
+                    >
+                      <Icon name="add_comment" className="!text-sm" />
+                      {noteComments.length > 0 ? noteComments.length : ''}
+                      <Icon name="add_a_photo" className="!text-sm" />
+                      {itemPhotos.length > 0 ? itemPhotos.length : ''}
+                    </button>
+                  </div>
+                  {note?.checkedBy && (
+                    <p className="mt-0.5 text-[10px] text-slate-400">
+                      {note.checkedAt && `${formatEntryTime(note.checkedAt)} `}
+                      {editorName(note.checkedBy)}
+                    </p>
+                  )}
+                </div>
               </div>
-              {note?.checkedBy && (
-                <p className="mt-0.5 pl-[52px] text-[10px] text-slate-400">
-                  {note.checkedAt && `${formatEntryTime(note.checkedAt)} `}
-                  {editorName(note.checkedBy)}
-                </p>
-              )}
               {commentOpen && (
                 <div className="mt-1.5 pl-9">
                   {noteComments.length > 0 && (
@@ -437,7 +443,12 @@ export default function TeamTopicScoreCard({
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     {itemPhotos.map((p) => (
                       <div key={p.id} className="group relative h-14 w-14 overflow-hidden rounded-md border border-slate-200">
-                        <img src={getTopicPhotoUrl(p.file_path)} alt={p.file_name ?? ''} className="h-full w-full object-cover" />
+                        <img
+                          src={getTopicPhotoUrl(p.file_path)}
+                          alt={p.file_name ?? ''}
+                          className="h-full w-full cursor-zoom-in object-cover"
+                          onClick={() => setLightboxPhoto(p)}
+                        />
                         {replacingPhotoId === p.id && (
                           <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-[10px] text-white">...</div>
                         )}
@@ -450,7 +461,7 @@ export default function TeamTopicScoreCard({
                             <input type="file" accept="image/*" className="hidden" onChange={(e) => handleReplacePhoto(p, e)} />
                           </label>
                         )}
-                        {isAdmin && (
+                        {(isAdmin || (!readOnly && p.uploaded_by === participantId)) && (
                           <button
                             type="button"
                             onClick={() => handleDeletePhoto(p)}
@@ -711,22 +722,39 @@ export default function TeamTopicScoreCard({
           {saving && <p className="mt-2 text-xs text-slate-400">กำลังบันทึก...</p>}
         </div>
       )}
+
+      <PhotoLightbox photo={lightboxPhoto} onClose={() => setLightboxPhoto(null)} />
     </div>
   )
 }
 
-function ToggleSwitch({ checked, disabled, onChange }: { checked: boolean; disabled: boolean; onChange: (v: boolean) => void }) {
+// No default: an item starts with neither button pressed (checked === null,
+// shown as "ยังไม่ประเมิน" in reports) until someone explicitly picks one —
+// sized generously since committee members are often older evaluators.
+function YesNoButtons({ checked, disabled, onChange }: { checked: boolean | null; disabled: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={`shrink-0 rounded-full px-3.5 py-2 text-sm font-bold text-white transition-colors ${
-        checked ? 'bg-emerald-500' : 'bg-red-400'
-      } disabled:opacity-60`}
-    >
-      {checked ? 'ใช่' : 'ไม่'}
-    </button>
+    <div className="flex shrink-0 gap-1.5">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onChange(true)}
+        className={`rounded-full px-4 py-2.5 text-sm font-bold transition-colors ${
+          checked === true ? 'bg-emerald-500 text-white' : 'border-2 border-slate-300 text-slate-400'
+        } disabled:opacity-60`}
+      >
+        ใช่
+      </button>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onChange(false)}
+        className={`rounded-full px-4 py-2.5 text-sm font-bold transition-colors ${
+          checked === false ? 'bg-red-400 text-white' : 'border-2 border-slate-300 text-slate-400'
+        } disabled:opacity-60`}
+      >
+        ไม่ใช่
+      </button>
+    </div>
   )
 }
 

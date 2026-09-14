@@ -91,7 +91,7 @@ export type TopicPhoto = {
 }
 
 export type ItemNote = {
-  checked: boolean
+  checked: boolean | null
   comment: string
 }
 
@@ -180,7 +180,7 @@ export type TeamComment = {
 }
 
 export type TeamItemNote = {
-  checked: boolean
+  checked: boolean | null
   checkedBy?: string | null
   checkedAt?: string | null
   comments?: TeamComment[]

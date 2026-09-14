@@ -124,16 +124,22 @@ function categoryTopics(cat: FullStandard['categories'][number]): TopicWithEvide
   return [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
 }
 
-function commentCell(heading: string | null, lines: string[], images: LogoAsset[], checked?: boolean | null) {
+const COMMENT_CELL_BORDER = { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' }
+
+function commentCell(heading: string | null, entries: CommentEntry[], images: LogoAsset[], checked?: boolean | null) {
   const paragraphs: Paragraph[] = []
-  if (checked !== undefined && checked !== null) {
+  if (checked !== undefined) {
     // Same green/red pill the web page uses for a sub-item's ใช่/ไม่ result —
     // docx has no rounded-corner shading, so a plain colored highlight
-    // behind bold white text is the closest equivalent.
+    // behind bold white text is the closest equivalent. `null` means nobody
+    // has pressed either button yet, shown as a neutral "ยังไม่ประเมิน" tag.
+    const badgeText = checked === null ? ' ยังไม่ประเมิน ' : checked ? ' ใช่ ' : ' ไม่ใช่ '
+    const badgeFill = checked === null ? 'E2E8F0' : checked ? '10B981' : 'F87171'
+    const badgeColor = checked === null ? '475569' : 'FFFFFF'
     paragraphs.push(
       new Paragraph({
         children: [
-          new TextRun({ text: checked ? ' ใช่ ' : ' ไม่ ', bold: true, color: 'FFFFFF', shading: { fill: checked ? '10B981' : 'F87171' } }),
+          new TextRun({ text: badgeText, bold: true, color: badgeColor, shading: { fill: badgeFill } }),
           ...(heading ? [new TextRun({ text: `  ${heading}`, bold: true, size: 20 })] : []),
         ],
       }),
@@ -141,14 +147,18 @@ function commentCell(heading: string | null, lines: string[], images: LogoAsset[
   } else if (heading) {
     paragraphs.push(new Paragraph({ children: [new TextRun({ text: heading, bold: true, size: 20 })] }))
   }
-  paragraphs.push(
-    ...lines.map(
-      (line) =>
-        new Paragraph({
-          children: [new TextRun({ text: line, italics: true, size: 20, color: '475569' })],
-        }),
-    ),
-  )
+  // Mirrors the web report's own comment styling: "ความคิดเห็น : {text}"
+  // with the text bold, and a faint "โดย {author}" line underneath — put in
+  // its own bordered cell (below) so it visually reads as separate from the
+  // ใช่/ไม่ result above it, same as on screen.
+  for (const entry of entries) {
+    paragraphs.push(
+      new Paragraph({
+        children: [new TextRun({ text: 'ความคิดเห็น : ', size: 20, color: '94A3B8' }), new TextRun({ text: entry.text, bold: true, size: 20, color: '1E293B' })],
+      }),
+      new Paragraph({ children: [new TextRun({ text: `โดย ${entry.author}`, size: 18, color: '94A3B8' })] }),
+    )
+  }
   if (images.length) {
     paragraphs.push(
       new Paragraph({
@@ -161,30 +171,44 @@ function commentCell(heading: string | null, lines: string[], images: LogoAsset[
   }
   return new TableCell({
     columnSpan: 3,
-    shading: { fill: 'F8FAFC' },
+    shading: { fill: 'FFFFFF' },
+    borders: { top: COMMENT_CELL_BORDER, bottom: COMMENT_CELL_BORDER, left: COMMENT_CELL_BORDER, right: COMMENT_CELL_BORDER },
     children: paragraphs,
   })
 }
 
-// "ความคิดเห็นที่ N : ... โดย ..." — one evaluator's comment per line, numbered
-// within its own group (general topic comments and each sub-item's comments
-// are numbered separately), with no extra status text.
-function buildCommentLines(
+type CommentEntry = { text: string; author: string }
+
+// Collaborative-mode comments arrive pre-flattened as "[name · time] text"
+// lines — split each back into its own entry with the embedded name as
+// author and the time dropped. A line with no bracket (average-mode
+// comments, or legacy data) just uses the participant's own name.
+function splitCommentEntries(raw: string, fallbackAuthor: string): CommentEntry[] {
+  return raw
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const m = line.match(/^\[([^\]]+)\]\s*(.*)$/)
+      if (!m) return { author: fallbackAuthor, text: line }
+      const name = m[1].split('·')[0].trim()
+      return { author: name || fallbackAuthor, text: m[2] }
+    })
+}
+
+function buildCommentEntries(
   agg: TopicAggregate | undefined,
   evaluatorNameById: Map<string, string>,
   pick: (s: TopicAggregate['scores'][number]) => string | null | undefined,
-): string[] {
+): CommentEntry[] {
   if (!agg) return []
-  const lines: string[] = []
-  let n = 0
+  const entries: CommentEntry[] = []
   for (const s of agg.scores) {
     const comment = pick(s)
     if (!comment) continue
-    n++
-    const name = evaluatorNameById.get(s.participant_id) ?? 'กรรมการ'
-    lines.push(`ความคิดเห็นที่ ${n} : ${comment} โดย ${name}`)
+    entries.push(...splitCommentEntries(comment, evaluatorNameById.get(s.participant_id) ?? 'กรรมการ'))
   }
-  return lines
+  return entries
 }
 
 // Majority vote across whoever touched this item — same rule aggregate.ts
@@ -196,7 +220,7 @@ function itemCheckedFinal(agg: TopicAggregate | undefined, itemId: string): bool
   for (const s of agg.scores) {
     const note = s.item_notes?.[itemId]
     if (!note) continue
-    checks.push(note.checked)
+    if (note.checked !== null) checks.push(note.checked)
   }
   return checks.length === 0 ? null : checks.filter(Boolean).length / checks.length >= 0.5
 }
@@ -301,17 +325,17 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
         }),
       )
       if (includeComments) {
-        const generalLines = buildCommentLines(agg, evaluatorNameById, (s) => s.comment)
-        if (generalLines.length) {
-          rows.push(new TableRow({ children: [commentCell(null, generalLines, [])] }))
+        const generalEntries = buildCommentEntries(agg, evaluatorNameById, (s) => s.comment)
+        if (generalEntries.length) {
+          rows.push(new TableRow({ children: [commentCell(null, generalEntries, [])] }))
         }
         for (const item of t.scoreItems) {
-          const itemLines = buildCommentLines(agg, evaluatorNameById, (s) => s.item_notes?.[item.id]?.comment)
+          const itemEntries = buildCommentEntries(agg, evaluatorNameById, (s) => s.item_notes?.[item.id]?.comment)
           const itemPhotos = photosByTopicAndItem?.get(t.id)?.get(item.id) ?? []
           const images = await fetchPhotoAssets(itemPhotos, imagesLeftTotal)
           const checked = itemCheckedFinal(agg, item.id)
-          if (itemLines.length || images.length || checked !== null) {
-            rows.push(new TableRow({ children: [commentCell(item.item_text, itemLines, images, checked)] }))
+          if (itemEntries.length || images.length || checked !== null) {
+            rows.push(new TableRow({ children: [commentCell(item.item_text, itemEntries, images, checked)] }))
           }
         }
       }
