@@ -83,7 +83,7 @@ export default function Join() {
         .maybeSingle()
       if (roundErr) throw roundErr
       if (!round) {
-        setError('ไม่พบรอบการประเมินสำหรับรหัสนี้ กรุณาตรวจสอบอีกครั้ง')
+        setError('ไม่พบรอบการประเมินสำหรับรหัสนี้')
         setLoading(false)
         return
       }
