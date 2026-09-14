@@ -13,13 +13,13 @@ import { downloadBlob, generateReportDocx } from '../lib/docxExport'
 import { formatThaiDate } from '../lib/thaiDate'
 import { getTopicPhotoUrl, groupPhotosByTopicAndItem, listRoundPhotos } from '../lib/topicPhotos'
 
-type CommentEntry = { text: string; author: string }
+type CommentEntry = { text: string; author: string; time?: string }
 
 // Collaborative-mode comments arrive pre-flattened as "[name · time] text"
-// lines (see teamScoreToScore) — split each line back into its own entry
-// with the embedded name as author and the time dropped, so the report
-// doesn't show that raw bracket text. A line with no bracket (average-mode
-// comments, or legacy data) just uses the participant's own name.
+// lines (see teamScoreToScore) — split each line back into its own entry,
+// keeping both the embedded name and time. A line with no bracket
+// (average-mode comments, or legacy data) just uses the participant's own
+// name and has no time to show.
 function splitCommentEntries(raw: string, fallbackAuthor: string): CommentEntry[] {
   return raw
     .split('\n')
@@ -28,8 +28,9 @@ function splitCommentEntries(raw: string, fallbackAuthor: string): CommentEntry[
     .map((line) => {
       const m = line.match(/^\[([^\]]+)\]\s*(.*)$/)
       if (!m) return { author: fallbackAuthor, text: line }
-      const name = m[1].split('·')[0].trim()
-      return { author: name || fallbackAuthor, text: m[2] }
+      const [namePart, timePart] = m[1].split('·')
+      const name = namePart.trim()
+      return { author: name || fallbackAuthor, text: m[2], time: timePart?.trim() || undefined }
     })
 }
 
@@ -78,16 +79,18 @@ const ITEM_LEVEL_LABEL: Record<(typeof ITEM_LEVEL_ORDER)[number], string> = {
   [-2]: 'หลักฐานประกอบการประเมิน',
 }
 
-// "ความคิดเห็น : {text}" with "โดย {author}" faint on the line beneath —
-// the comment text itself is the prominent part.
+// "ความคิดเห็น :" label on its own line, the text starting on the next
+// line, then a faint "โดย : {author} {h:mm}" line — the comment text
+// itself is the prominent part.
 function CommentLine({ entry }: { entry: CommentEntry }) {
   return (
     <div>
-      <p className="text-[11.5px]">
-        <span className="text-slate-400">ความคิดเห็น : </span>
-        <span className="whitespace-pre-line font-semibold text-slate-800">{entry.text}</span>
+      <p className="text-[11.5px] text-slate-400">ความคิดเห็น :</p>
+      <p className="whitespace-pre-line text-[11.5px] font-semibold text-slate-800">{entry.text}</p>
+      <p className="text-[10px] text-slate-400">
+        โดย : {entry.author}
+        {entry.time ? ` ${entry.time}` : ''}
       </p>
-      <p className="text-[10px] text-slate-400">โดย {entry.author}</p>
     </div>
   )
 }
@@ -440,13 +443,6 @@ export default function Report() {
                         {hasDetail && (
                           <tr className="break-inside-avoid border-b border-dotted border-slate-300">
                             <td colSpan={3} className="bg-slate-50 px-3 py-2 align-top text-xs text-slate-600 print:text-[11px]">
-                              {generalEntries.length > 0 && (
-                                <div className="mb-1.5 space-y-1.5 rounded-md border border-slate-200 bg-white p-2 last:mb-0">
-                                  {generalEntries.map((e, i) => (
-                                    <CommentLine key={i} entry={e} />
-                                  ))}
-                                </div>
-                              )}
                               {levelGroups.map(({ level, items }) => (
                                 <div key={level} className="mt-1.5 first:mt-0">
                                   <p className="text-[11px] font-semibold text-slate-500">{ITEM_LEVEL_LABEL[level]}</p>
@@ -461,7 +457,7 @@ export default function Report() {
                                         <div className="min-w-0 flex-1">
                                           <p className="text-[13px] font-medium text-slate-700">{item.item_text}</p>
                                           {detail.comments.length > 0 && (
-                                            <div className="mt-1 space-y-1.5 rounded-md border border-slate-200 bg-white p-2">
+                                            <div className="mt-1 space-y-1.5 rounded-md border border-sky-200 bg-sky-50 p-2">
                                               {detail.comments.map((e, i) => (
                                                 <CommentLine key={i} entry={e} />
                                               ))}
@@ -486,6 +482,13 @@ export default function Report() {
                                   </div>
                                 </div>
                               ))}
+                              {generalEntries.length > 0 && (
+                                <div className="mt-1.5 space-y-1.5 rounded-md border border-sky-200 bg-sky-50 p-2 first:mt-0">
+                                  {generalEntries.map((e, i) => (
+                                    <CommentLine key={i} entry={e} />
+                                  ))}
+                                </div>
+                              )}
                             </td>
                           </tr>
                         )}
@@ -525,12 +528,12 @@ export default function Report() {
       )}
 
       <div className="break-inside-avoid">
-        <div className="mb-8 p-4 text-center print:mb-4 print:p-2">
+        <div className="mb-8 px-4 py-7 text-center print:mb-4 print:py-4">
           <p className="text-sm font-bold text-slate-800 print:text-[10px]">สรุปผลการประเมินภาพรวม</p>
-          <p className="text-3xl font-bold text-slate-800 print:text-base">{Math.round(grandTotal)} คะแนน</p>
-          <p className={`text-sm font-semibold print:text-[10px] ${overallPass ? 'text-emerald-600' : 'text-red-600'}`}>
-            {overallPass ? 'ผ่านเกณฑ์ มาตรฐานพื้นฐานครบทุกหัวข้อ' : `ไม่ผ่านเกณฑ์ มาตรฐานพื้นฐาน จำนวน ${mustFailTopics.length} หัวข้อ`}
+          <p className={`mt-1 text-2xl font-bold print:text-base ${overallPass ? 'text-emerald-600' : 'text-red-600'}`}>
+            {overallPass ? 'ผ่านเกณฑ์ทุกข้อ' : `ผ่าน ${flatTopics.length - mustFailTopics.length} ข้อ ต้องพัฒนา ${mustFailTopics.length} ข้อ`}
           </p>
+          <p className="mt-1 text-sm font-semibold text-slate-800 print:text-[10px]">{Math.round(grandTotal)} คะแนน</p>
         </div>
 
         <div className="grid grid-cols-2 gap-8 pt-8 text-center text-sm print:gap-6 print:pt-0 print:text-[10px]">

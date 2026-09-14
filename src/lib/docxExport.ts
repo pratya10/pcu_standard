@@ -124,7 +124,7 @@ function categoryTopics(cat: FullStandard['categories'][number]): TopicWithEvide
   return [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
 }
 
-const COMMENT_CELL_BORDER = { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' }
+const COMMENT_CELL_BORDER = { style: BorderStyle.SINGLE, size: 4, color: 'BAE6FD' }
 
 function commentCell(heading: string | null, entries: CommentEntry[], images: LogoAsset[], checked?: boolean | null) {
   const paragraphs: Paragraph[] = []
@@ -147,16 +147,18 @@ function commentCell(heading: string | null, entries: CommentEntry[], images: Lo
   } else if (heading) {
     paragraphs.push(new Paragraph({ children: [new TextRun({ text: heading, bold: true, size: 20 })] }))
   }
-  // Mirrors the web report's own comment styling: "ความคิดเห็น : {text}"
-  // with the text bold, and a faint "โดย {author}" line underneath — put in
-  // its own bordered cell (below) so it visually reads as separate from the
-  // ใช่/ไม่ result above it, same as on screen.
+  // Mirrors the web report's own comment styling: "ความคิดเห็น :" label on
+  // its own line, the text starting on the next line, then a faint
+  // "โดย : {author} {h:mm}" line — put in its own bordered cell (below) so
+  // it visually reads as separate from the ใช่/ไม่ result above it, same as
+  // on screen.
   for (const entry of entries) {
     paragraphs.push(
+      new Paragraph({ children: [new TextRun({ text: 'ความคิดเห็น :', size: 20, color: '94A3B8' })] }),
+      new Paragraph({ children: [new TextRun({ text: entry.text, bold: true, size: 20, color: '1E293B' })] }),
       new Paragraph({
-        children: [new TextRun({ text: 'ความคิดเห็น : ', size: 20, color: '94A3B8' }), new TextRun({ text: entry.text, bold: true, size: 20, color: '1E293B' })],
+        children: [new TextRun({ text: `โดย : ${entry.author}${entry.time ? ` ${entry.time}` : ''}`, size: 18, color: '94A3B8' })],
       }),
-      new Paragraph({ children: [new TextRun({ text: `โดย ${entry.author}`, size: 18, color: '94A3B8' })] }),
     )
   }
   if (images.length) {
@@ -171,18 +173,18 @@ function commentCell(heading: string | null, entries: CommentEntry[], images: Lo
   }
   return new TableCell({
     columnSpan: 3,
-    shading: { fill: 'FFFFFF' },
+    shading: { fill: 'F0F9FF' },
     borders: { top: COMMENT_CELL_BORDER, bottom: COMMENT_CELL_BORDER, left: COMMENT_CELL_BORDER, right: COMMENT_CELL_BORDER },
     children: paragraphs,
   })
 }
 
-type CommentEntry = { text: string; author: string }
+type CommentEntry = { text: string; author: string; time?: string }
 
 // Collaborative-mode comments arrive pre-flattened as "[name · time] text"
-// lines — split each back into its own entry with the embedded name as
-// author and the time dropped. A line with no bracket (average-mode
-// comments, or legacy data) just uses the participant's own name.
+// lines — split each back into its own entry, keeping both the embedded
+// name and time. A line with no bracket (average-mode comments, or legacy
+// data) just uses the participant's own name and has no time to show.
 function splitCommentEntries(raw: string, fallbackAuthor: string): CommentEntry[] {
   return raw
     .split('\n')
@@ -191,8 +193,9 @@ function splitCommentEntries(raw: string, fallbackAuthor: string): CommentEntry[
     .map((line) => {
       const m = line.match(/^\[([^\]]+)\]\s*(.*)$/)
       if (!m) return { author: fallbackAuthor, text: line }
-      const name = m[1].split('·')[0].trim()
-      return { author: name || fallbackAuthor, text: m[2] }
+      const [namePart, timePart] = m[1].split('·')
+      const name = namePart.trim()
+      return { author: name || fallbackAuthor, text: m[2], time: timePart?.trim() || undefined }
     })
 }
 
@@ -325,10 +328,9 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
         }),
       )
       if (includeComments) {
-        const generalEntries = buildCommentEntries(agg, evaluatorNameById, (s) => s.comment)
-        if (generalEntries.length) {
-          rows.push(new TableRow({ children: [commentCell(null, generalEntries, [])] }))
-        }
+        // Per-item comments first (each sits with its own sub-item, matching
+        // the score form), then the topic's own general comment last (it's
+        // the "เหตุผล / บันทึกเพิ่มเติม" box at the bottom of the score form).
         for (const item of t.scoreItems) {
           const itemEntries = buildCommentEntries(agg, evaluatorNameById, (s) => s.item_notes?.[item.id]?.comment)
           const itemPhotos = photosByTopicAndItem?.get(t.id)?.get(item.id) ?? []
@@ -337,6 +339,10 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
           if (itemEntries.length || images.length || checked !== null) {
             rows.push(new TableRow({ children: [commentCell(item.item_text, itemEntries, images, checked)] }))
           }
+        }
+        const generalEntries = buildCommentEntries(agg, evaluatorNameById, (s) => s.comment)
+        if (generalEntries.length) {
+          rows.push(new TableRow({ children: [commentCell(null, generalEntries, [])] }))
         }
       }
     }
@@ -354,24 +360,29 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
   }
 
   const overallPass = mustFailCount === 0
+  const totalTopics = standard.categories.reduce((sum, cat) => sum + categoryTopics(cat).length, 0)
   children.push(
+    new Paragraph({ text: '' }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
       children: [new TextRun({ text: 'สรุปผลการประเมินภาพรวม', bold: true })],
     }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: `${Math.round(grandTotal)} คะแนน`, bold: true, size: 32 })],
-    }),
-    new Paragraph({
-      alignment: AlignmentType.CENTER,
+      spacing: { before: 100 },
       children: [
         new TextRun({
-          text: overallPass ? 'ผ่านเกณฑ์ มาตรฐานพื้นฐานครบทุกหัวข้อ' : `ไม่ผ่านเกณฑ์ มาตรฐานพื้นฐาน จำนวน ${mustFailCount} หัวข้อ`,
+          text: overallPass ? 'ผ่านเกณฑ์ทุกข้อ' : `ผ่าน ${totalTopics - mustFailCount} ข้อ ต้องพัฒนา ${mustFailCount} ข้อ`,
           bold: true,
+          size: 28,
           color: overallPass ? '059669' : 'DC2626',
         }),
       ],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 100 },
+      children: [new TextRun({ text: `${Math.round(grandTotal)} คะแนน`, bold: true })],
     }),
     new Paragraph({ text: '' }),
     new Paragraph({ text: '' }),
