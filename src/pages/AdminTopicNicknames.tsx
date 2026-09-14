@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { compareTopicCode } from '../lib/loadStandard'
 import type { Category, Topic, TopicGroup } from '../types'
 import AdminLayout from '../components/AdminLayout'
 
@@ -21,11 +22,13 @@ export default function AdminTopicNicknames() {
       ])
       const catById = new Map(((categoriesData as Category[]) ?? []).map((c) => [c.id, c]))
       const groupById = new Map(((groupsData as TopicGroup[]) ?? []).map((g) => [g.id, g]))
-      const rows: TopicRow[] = ((topicsData as Topic[]) ?? []).map((t) => ({
-        ...t,
-        categoryLabel: catById.get(t.category_id)?.name_th ?? '-',
-        groupLabel: t.topic_group_id ? (groupById.get(t.topic_group_id)?.name_th ?? null) : null,
-      }))
+      const rows: TopicRow[] = ((topicsData as Topic[]) ?? [])
+        .map((t) => ({
+          ...t,
+          categoryLabel: catById.get(t.category_id)?.name_th ?? '-',
+          groupLabel: t.topic_group_id ? (groupById.get(t.topic_group_id)?.name_th ?? null) : null,
+        }))
+        .sort((a, b) => compareTopicCode(a.code, b.code))
       setTopics(rows)
       setDrafts(Object.fromEntries(rows.map((t) => [t.id, t.short_name ?? ''])))
       setLoading(false)

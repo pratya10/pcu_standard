@@ -1,6 +1,23 @@
 import { supabase } from './supabaseClient'
 import type { Category, FullStandard, StandardVersion, Topic, TopicEvidenceItem, TopicGroup, TopicScoreItem } from '../types'
 
+// Topics are meant to read in their dotted-code order (1.1, 1.2, 1.3, 2.1.1,
+// ...) everywhere they're shown — the score-entry page, live dashboard, and
+// every report — but their `sort_order` values don't reliably match that,
+// so compare the codes themselves (numerically per segment, not as plain
+// strings, or "1.10" would sort before "1.2").
+export function compareTopicCode(a: string, b: string): number {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  const len = Math.max(pa.length, pb.length)
+  for (let i = 0; i < len; i++) {
+    const na = pa[i] ?? 0
+    const nb = pb[i] ?? 0
+    if (na !== nb) return na - nb
+  }
+  return 0
+}
+
 export async function loadLatestStandard(): Promise<FullStandard> {
   const { data: versions, error: vErr } = await supabase
     .from('standard_versions')
@@ -70,12 +87,12 @@ export async function loadStandardByVersionId(standardVersionId: string): Promis
           ...g,
           topics: topicsInScope
             .filter((t) => t.topic_group_id === g.id)
-            .sort((a, b) => a.sort_order - b.sort_order)
+            .sort((a, b) => compareTopicCode(a.code, b.code))
             .map(withEvidence),
         }))
       const bareTopics = topicsInScope
         .filter((t) => t.category_id === cat.id && !t.topic_group_id)
-        .sort((a, b) => a.sort_order - b.sort_order)
+        .sort((a, b) => compareTopicCode(a.code, b.code))
         .map(withEvidence)
       return { ...cat, groups: groupsForCat, topics: bareTopics }
     })
