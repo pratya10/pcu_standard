@@ -268,9 +268,9 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
       rows.push(
         new TableRow({
           children: [
-            cell(`${t.code}  ${t.name_th}`),
-            cell(mustLabel, { align: AlignmentType.CENTER }),
-            cell(formatAvg(agg?.avgScore ?? null), { align: AlignmentType.CENTER }),
+            cell(`${t.code}  ${t.name_th}`, { width: 60 }),
+            cell(mustLabel, { width: 20, align: AlignmentType.CENTER }),
+            cell(formatAvg(agg?.avgScore ?? null), { width: 20, align: AlignmentType.CENTER }),
           ],
         }),
       )
@@ -292,9 +292,9 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
     rows.push(
       new TableRow({
         children: [
-          cell('รวม', { bold: true }),
-          cell(catPass ? 'ผ่าน' : 'ไม่ผ่าน', { bold: true, align: AlignmentType.CENTER }),
-          cell(catTotal.toFixed(1), { bold: true, align: AlignmentType.CENTER }),
+          cell('รวม', { bold: true, width: 60 }),
+          cell(catPass ? 'ผ่าน' : 'ไม่ผ่าน', { bold: true, width: 20, align: AlignmentType.CENTER }),
+          cell(catTotal.toFixed(1), { bold: true, width: 20, align: AlignmentType.CENTER }),
         ],
       }),
     )
@@ -318,7 +318,7 @@ export async function generateReportDocx(input: ReportDocxInput): Promise<Blob> 
         new TextRun({
           text: overallPass ? 'ผ่านเกณฑ์ มาตรฐานพื้นฐานครบทุกหัวข้อ' : `ไม่ผ่านเกณฑ์ มาตรฐานพื้นฐาน จำนวน ${mustFailCount} หัวข้อ`,
           bold: true,
-          color: overallPass ? '15803D' : 'DC2626',
+          color: overallPass ? '059669' : 'DC2626',
         }),
       ],
     }),

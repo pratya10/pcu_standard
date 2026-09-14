@@ -405,8 +405,8 @@ export default function Report() {
                 <thead>
                   <tr className={`border-b border-dotted border-slate-400 text-left text-xs text-slate-500 ${compact ? 'print:text-[7px]' : 'print:text-[11px]'}`}>
                     <th className={`py-1 pr-2 ${compact ? 'print:py-0' : 'print:py-1'}`}>หัวข้อ</th>
-                    <th className={`py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>มาตรฐานพื้นฐาน</th>
-                    <th className={`py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>การพัฒนาต่อเนื่อง</th>
+                    <th className={`w-[17%] py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>มาตรฐานพื้นฐาน</th>
+                    <th className={`w-[17%] py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>การพัฒนาต่อเนื่อง</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -434,10 +434,10 @@ export default function Report() {
                             <span className={`font-mono text-xs text-slate-400 ${compact ? 'print:text-[7px]' : 'print:text-[10px]'}`}>{t.code}</span>{' '}
                             {t.name_th}
                           </td>
-                          <td className={`py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>
+                          <td className={`w-[17%] py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>
                             {agg?.mustPassFinal === null || agg?.mustPassFinal === undefined ? '-' : agg.mustPassFinal ? 'ผ่าน' : 'ไม่ผ่าน'}
                           </td>
-                          <td className={`py-1 pr-2 text-center font-semibold ${compact ? 'print:py-0' : 'print:py-1'}`}>{formatAvg(agg?.avgScore ?? null)}</td>
+                          <td className={`w-[17%] py-1 pr-2 text-center font-semibold ${compact ? 'print:py-0' : 'print:py-1'}`}>{formatAvg(agg?.avgScore ?? null)}</td>
                         </tr>
                         {hasDetail && (
                           <tr className="break-inside-avoid border-b border-dotted border-slate-400">
@@ -491,8 +491,8 @@ export default function Report() {
                   })}
                   <tr className="font-semibold text-slate-800">
                     <td className={`py-1 pr-2 ${compact ? 'print:py-0' : 'print:py-1'}`}>รวม</td>
-                    <td className={`py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>{catPass ? 'ผ่าน' : 'ไม่ผ่าน'}</td>
-                    <td className={`py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>{catTotal.toFixed(1)}</td>
+                    <td className={`w-[17%] py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>{catPass ? 'ผ่าน' : 'ไม่ผ่าน'}</td>
+                    <td className={`w-[17%] py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>{catTotal.toFixed(1)}</td>
                   </tr>
                 </tbody>
               </table>
