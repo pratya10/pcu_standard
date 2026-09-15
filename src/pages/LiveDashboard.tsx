@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import { loadStandardByVersionId, allTopicsFlat } from '../lib/loadStandard'
+import { loadStandardByVersionId, allTopicsFlat, compareTopicCode } from '../lib/loadStandard'
 import { fetchScoresForRound } from '../lib/scoresApi'
 import { fetchTeamScoresForRound, teamScoreToScore } from '../lib/teamScoresApi'
 import { aggregateAll, formatAvg } from '../lib/aggregate'
@@ -146,7 +146,7 @@ export default function LiveDashboard() {
       </div>
 
       {standard.categories.map((cat) => {
-        const catTopics = [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
+        const catTopics = [...cat.topics, ...cat.groups.flatMap((g) => g.topics)].sort((a, b) => compareTopicCode(a.code, b.code))
         const catTotal = catTopics.reduce((sum, t) => sum + (aggregates.get(t.id)?.avgScore ?? 0), 0)
         const catPass = catTopics.every((t) => aggregates.get(t.id)?.mustPassFinal !== false)
         return (

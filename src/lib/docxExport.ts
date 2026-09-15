@@ -13,6 +13,7 @@ import {
   WidthType,
 } from 'docx'
 import { getLogoUrl } from './branding'
+import { compareTopicCode } from './loadStandard'
 import { getTopicPhotoUrl } from './topicPhotos'
 import { formatAvg, type TopicAggregate } from './aggregate'
 import { formatThaiDate } from './thaiDate'
@@ -121,7 +122,7 @@ function signatureCell(lines: string[]) {
 }
 
 function categoryTopics(cat: FullStandard['categories'][number]): TopicWithEvidence[] {
-  return [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
+  return [...cat.topics, ...cat.groups.flatMap((g) => g.topics)].sort((a, b) => compareTopicCode(a.code, b.code))
 }
 
 const COMMENT_CELL_BORDER = { style: BorderStyle.SINGLE, size: 4, color: 'BAE6FD' }

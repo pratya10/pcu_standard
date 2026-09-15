@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { jsPDF } from 'jspdf'
 import html2canvas from 'html2canvas-pro'
 import { supabase } from '../lib/supabaseClient'
-import { loadStandardByVersionId, allTopicsFlat } from '../lib/loadStandard'
+import { loadStandardByVersionId, allTopicsFlat, compareTopicCode } from '../lib/loadStandard'
 import { fetchScoresForRound } from '../lib/scoresApi'
 import { fetchTeamScoreAuditForRound, fetchTeamScoresForRound, teamScoreToScore } from '../lib/teamScoresApi'
 import { aggregateAll, formatAvg } from '../lib/aggregate'
@@ -294,7 +294,7 @@ export default function Report() {
     if (!standard) return
     const rows = [['หมวด', 'รหัสหัวข้อ', 'ชื่อหัวข้อ', 'ผ่านมาตรฐานพื้นฐาน', 'คะแนนเฉลี่ย', 'จำนวนผู้ประเมิน', 'N/A']]
     for (const cat of standard.categories) {
-      const catTopics = [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
+      const catTopics = [...cat.topics, ...cat.groups.flatMap((g) => g.topics)].sort((a, b) => compareTopicCode(a.code, b.code))
       for (const t of catTopics) {
         const agg = aggregates.get(t.id)
         rows.push([
@@ -472,7 +472,7 @@ export default function Report() {
 
       <div className={printMode === 'summary' ? 'print:mb-8' : ''}>
         {standard.categories.map((cat) => {
-          const catTopics = [...cat.topics, ...cat.groups.flatMap((g) => g.topics)]
+          const catTopics = [...cat.topics, ...cat.groups.flatMap((g) => g.topics)].sort((a, b) => compareTopicCode(a.code, b.code))
           const catTotal = catTopics.reduce((sum, t) => sum + (aggregates.get(t.id)?.avgScore ?? 0), 0)
           const catPass = catTopics.every((t) => aggregates.get(t.id)?.mustPassFinal !== false)
           const compact = printMode === 'summary'
