@@ -6,6 +6,7 @@ import type { AssessmentRound, Facility, Participant } from '../types'
 import AdminLayout from '../components/AdminLayout'
 import { formatThaiDate } from '../lib/thaiDate'
 import { useConfirm } from '../components/ConfirmProvider'
+import { mergeParticipants, renameParticipant } from '../lib/participantsApi'
 
 export default function AdminRoundDetail() {
   const { roundId } = useParams<{ roundId: string }>()
@@ -23,6 +24,11 @@ export default function AdminRoundDetail() {
   const [editingCode, setEditingCode] = useState(false)
   const [editCode, setEditCode] = useState('')
   const [codeError, setCodeError] = useState<string | null>(null)
+  const [editingParticipantId, setEditingParticipantId] = useState<string | null>(null)
+  const [editParticipantName, setEditParticipantName] = useState('')
+  const [mergingParticipantId, setMergingParticipantId] = useState<string | null>(null)
+  const [mergeTargetId, setMergeTargetId] = useState('')
+  const [merging, setMerging] = useState(false)
 
   async function load() {
     if (!roundId) return
@@ -68,6 +74,51 @@ export default function AdminRoundDetail() {
     if (!(await confirm({ title: 'ลบผู้เข้าร่วม', message: 'ลบผู้เข้าร่วมนี้ออกจากรอบการประเมิน?', confirmLabel: 'ลบ' }))) return
     await supabase.from('participants').delete().eq('id', id)
     load()
+  }
+
+  function startEditParticipant(p: Participant) {
+    setEditingParticipantId(p.id)
+    setEditParticipantName(p.name)
+  }
+
+  async function saveParticipantName() {
+    if (!editingParticipantId || !editParticipantName.trim()) return
+    setUpdating(true)
+    try {
+      await renameParticipant(editingParticipantId, editParticipantName.trim())
+      await load()
+      setEditingParticipantId(null)
+    } catch (err) {
+      alert('บันทึกไม่สำเร็จ: ' + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  function startMergeParticipant(p: Participant) {
+    setMergingParticipantId(p.id)
+    setMergeTargetId('')
+  }
+
+  async function confirmMergeParticipant(keep: Participant) {
+    const other = participants.find((p) => p.id === mergeTargetId)
+    if (!other) return
+    const ok = await confirm({
+      title: 'รวมผู้เข้าร่วมซ้ำ',
+      message: `รวม "${other.name}" เข้ากับ "${keep.name}"?\nคะแนนทั้งหมดของ "${other.name}" จะย้ายมาอยู่ที่ "${keep.name}" แล้วลบ "${other.name}" ออก การกระทำนี้ย้อนกลับไม่ได้`,
+      confirmLabel: 'รวม',
+    })
+    if (!ok) return
+    setMerging(true)
+    try {
+      await mergeParticipants(keep.id, other.id)
+      await load()
+      setMergingParticipantId(null)
+    } catch (err) {
+      alert('รวมไม่สำเร็จ: ' + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setMerging(false)
+    }
   }
 
   function startEditInfo() {
@@ -306,16 +357,81 @@ export default function AdminRoundDetail() {
       <h2 className="mb-2 text-sm font-bold text-slate-700">ผู้เข้าร่วม ({participants.length})</h2>
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         {participants.map((p) => (
-          <div key={p.id} className="flex items-center justify-between border-b border-slate-100 px-4 py-2 text-sm last:border-0">
-            <div>
-              <span className="font-medium text-slate-800">{p.name}</span>{' '}
-              <span className="text-xs text-slate-400">
-                {p.role === 'evaluator' ? 'กรรมการประเมิน' : p.role === 'viewer' ? 'ผู้สังเกตการณ์' : 'ประธาน'}
-              </span>
+          <div key={p.id} className="border-b border-slate-100 px-4 py-2 text-sm last:border-0">
+            <div className="flex items-center justify-between">
+              {editingParticipantId === p.id ? (
+                <div className="flex flex-1 items-center gap-2">
+                  <input
+                    value={editParticipantName}
+                    onChange={(e) => setEditParticipantName(e.target.value)}
+                    autoFocus
+                    className="flex-1 rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                  />
+                  <button
+                    onClick={saveParticipantName}
+                    disabled={updating}
+                    className="rounded-lg bg-emerald-600 px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+                  >
+                    บันทึก
+                  </button>
+                  <button onClick={() => setEditingParticipantId(null)} className="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-500">
+                    ยกเลิก
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <span className="font-medium text-slate-800">{p.name}</span>{' '}
+                  <span className="text-xs text-slate-400">
+                    {p.role === 'evaluator' ? 'กรรมการประเมิน' : p.role === 'viewer' ? 'ผู้สังเกตการณ์' : 'ประธาน'}
+                  </span>
+                </div>
+              )}
+              {editingParticipantId !== p.id && (
+                <div className="flex shrink-0 items-center gap-3">
+                  <button onClick={() => startEditParticipant(p)} className="text-xs text-emerald-700 hover:underline">
+                    แก้ไขชื่อ
+                  </button>
+                  {participants.length > 1 && (
+                    <button onClick={() => startMergeParticipant(p)} className="text-xs text-sky-700 hover:underline">
+                      รวมชื่อซ้ำ
+                    </button>
+                  )}
+                  <button onClick={() => removeParticipant(p.id)} className="text-xs text-red-500 hover:text-red-700">
+                    ลบ
+                  </button>
+                </div>
+              )}
             </div>
-            <button onClick={() => removeParticipant(p.id)} className="text-xs text-red-500 hover:text-red-700">
-              ลบ
-            </button>
+            {mergingParticipantId === p.id && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-sky-50 p-2">
+                <span className="text-xs text-slate-600">รวม</span>
+                <select
+                  value={mergeTargetId}
+                  onChange={(e) => setMergeTargetId(e.target.value)}
+                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
+                >
+                  <option value="">เลือกผู้เข้าร่วมที่ซ้ำกัน...</option>
+                  {participants
+                    .filter((other) => other.id !== p.id)
+                    .map((other) => (
+                      <option key={other.id} value={other.id}>
+                        {other.name}
+                      </option>
+                    ))}
+                </select>
+                <span className="text-xs text-slate-600">เข้ากับ "{p.name}"</span>
+                <button
+                  onClick={() => confirmMergeParticipant(p)}
+                  disabled={merging || !mergeTargetId}
+                  className="rounded-lg bg-sky-600 px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  {merging ? 'กำลังรวม...' : 'ยืนยันรวม'}
+                </button>
+                <button onClick={() => setMergingParticipantId(null)} className="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-500">
+                  ยกเลิก
+                </button>
+              </div>
+            )}
           </div>
         ))}
         {participants.length === 0 && <p className="px-4 py-6 text-center text-sm text-slate-400">ยังไม่มีผู้เข้าร่วม</p>}
