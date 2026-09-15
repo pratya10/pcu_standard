@@ -331,7 +331,7 @@ export default function Report() {
   const pdfSummaryCapture = exportingPdf === 'summary'
 
   return (
-    <div ref={printAreaRef} className={`mx-auto max-w-3xl px-6 py-8 print:px-0 print:py-0 ${pdfSummaryCapture ? 'px-0 py-1' : ''}`}>
+    <div ref={printAreaRef} className={pdfSummaryCapture ? 'mx-auto max-w-3xl px-2 py-2' : 'mx-auto max-w-3xl px-6 py-8 print:px-0 print:py-0'}>
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-2">
           <Link to={`/round/${roundId}/score`} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600">
@@ -402,36 +402,56 @@ export default function Report() {
         </div>
       </div>
 
-      <div className={`mb-6 text-center print:mb-8 ${pdfSummaryCapture ? 'mb-1' : ''}`}>
-        <BrandLogo className={`mx-auto mb-3 h-[83px] w-auto object-contain print:mb-1 print:h-11 ${pdfSummaryCapture ? 'mb-1 h-11' : ''}`} />
-        <h1 className={`text-2xl font-bold text-slate-800 print:text-sm ${pdfSummaryCapture ? 'text-sm' : ''}`}>รายงานผลการประเมินมาตรฐานหน่วยบริการปฐมภูมิ</h1>
-        <p className={`text-base text-slate-500 print:text-[10px] ${pdfSummaryCapture ? 'text-[10px]' : ''}`}>{standard.standardVersion.name}</p>
+      <div className={pdfSummaryCapture ? 'mb-0.5 text-center' : 'mb-6 text-center print:mb-8'}>
+        <BrandLogo
+          className={
+            pdfSummaryCapture
+              ? 'mx-auto mb-1 h-10 w-auto object-contain'
+              : 'mx-auto mb-3 h-[83px] w-auto object-contain print:mb-1 print:h-11'
+          }
+        />
+        <h1 className={pdfSummaryCapture ? 'text-[13px] font-bold text-slate-800' : 'text-2xl font-bold text-slate-800 print:text-sm'}>
+          รายงานผลการประเมินมาตรฐานหน่วยบริการปฐมภูมิ
+        </h1>
+        <p className={pdfSummaryCapture ? 'text-[10px] text-slate-500' : 'text-base text-slate-500 print:text-[10px]'}>
+          {standard.standardVersion.name}
+        </p>
       </div>
 
-      <table className={`mb-6 w-full border-collapse text-base print:mb-8 print:text-[9.5px] ${pdfSummaryCapture ? 'mb-1 text-[9.5px]' : ''}`}>
+      <table
+        className={
+          pdfSummaryCapture
+            ? 'mb-1 w-full border-collapse text-[11px] leading-snug'
+            : 'mb-6 w-full border-collapse text-base print:mb-8 print:text-[9.5px]'
+        }
+      >
         <tbody>
           <tr className="border-b border-dotted border-slate-300">
-            <td className="w-[28%] py-1 pr-2 align-top font-semibold text-slate-700">หน่วยบริการ</td>
-            <td className="py-1">{facility?.name}</td>
+            <td className={`w-[28%] pr-2 align-top font-semibold text-slate-700 ${pdfSummaryCapture ? 'py-0' : 'py-1'}`}>หน่วยบริการ</td>
+            <td className={pdfSummaryCapture ? 'py-0' : 'py-1'}>{facility?.name}</td>
           </tr>
           <tr className="border-b border-dotted border-slate-300">
-            <td className="py-1 pr-2 align-top font-semibold text-slate-700">รหัสหน่วยบริการปฐมภูมิ</td>
-            <td className="py-1">
+            <td className={`pr-2 align-top font-semibold text-slate-700 ${pdfSummaryCapture ? 'py-0' : 'py-1'}`}>รหัสหน่วยบริการปฐมภูมิ</td>
+            <td className={pdfSummaryCapture ? 'py-0' : 'py-1'}>
               {facility?.pcu_code ?? '-'} ( รหัสสถานพยาบาล {facility?.code ?? '-'} )
             </td>
           </tr>
           <tr className="border-b border-dotted border-slate-300">
-            <td className="py-1 pr-2 align-top font-semibold text-slate-700">รอบการประเมิน</td>
-            <td className="py-1">{round.name}</td>
+            <td className={`pr-2 align-top font-semibold text-slate-700 ${pdfSummaryCapture ? 'py-0' : 'py-1'}`}>รอบการประเมิน</td>
+            <td className={pdfSummaryCapture ? 'py-0' : 'py-1'}>{round.name}</td>
           </tr>
           <tr className="border-b border-dotted border-slate-300">
-            <td className="py-1 pr-2 align-top font-semibold text-slate-700">วันที่ประเมิน</td>
-            <td className="py-1">{formatThaiDate(round.survey_date)}</td>
+            <td className={`pr-2 align-top font-semibold text-slate-700 ${pdfSummaryCapture ? 'py-0' : 'py-1'}`}>วันที่ประเมิน</td>
+            <td className={pdfSummaryCapture ? 'py-0' : 'py-1'}>{formatThaiDate(round.survey_date)}</td>
           </tr>
           <tr>
-            <td className="py-1 pr-2 align-top font-semibold text-slate-700">คณะกรรมการผู้ประเมิน</td>
-            <td className="py-1">
-              {evaluators.length > 0 ? (
+            <td className={`pr-2 align-top font-semibold text-slate-700 ${pdfSummaryCapture ? 'py-0' : 'py-1'}`}>คณะกรรมการผู้ประเมิน</td>
+            <td className={pdfSummaryCapture ? 'py-0' : 'py-1'}>
+              {evaluators.length === 0 ? (
+                '-'
+              ) : pdfSummaryCapture ? (
+                evaluators.map((e, i) => `${i + 1}. ${e.name}${e.civil_service_level ? ` (${e.civil_service_level})` : ''}`).join('  ')
+              ) : (
                 <table className="w-full border-collapse">
                   <tbody>
                     {evaluators.map((e, i) => (
@@ -444,8 +464,6 @@ export default function Report() {
                     ))}
                   </tbody>
                 </table>
-              ) : (
-                '-'
               )}
             </td>
           </tr>
@@ -464,22 +482,47 @@ export default function Report() {
           // plain classes instead of print:-gated ones.
           const pdfCompact = compact && exportingPdf === 'summary'
           return (
-            <div key={cat.id} className={`mb-6 break-inside-avoid ${pdfCompact ? 'mb-1' : compact ? 'print:mb-1' : 'print:mb-6'}`}>
+            <div
+              key={cat.id}
+              className={pdfCompact ? 'mb-1 break-inside-avoid' : compact ? 'mb-6 break-inside-avoid print:mb-1' : 'mb-6 break-inside-avoid print:mb-6'}
+            >
               <h2
-                className={`mb-2 text-base font-bold text-[#2E74B5] ${pdfCompact ? 'mb-0.5 text-[9px]' : compact ? 'print:mb-0.5 print:text-[9px]' : 'print:text-sm'}`}
+                className={
+                  pdfCompact
+                    ? 'mb-1 text-[12px] font-bold text-[#2E74B5]'
+                    : compact
+                      ? 'mb-2 text-base font-bold text-[#2E74B5] print:mb-0.5 print:text-[9px]'
+                      : 'mb-2 text-base font-bold text-[#2E74B5] print:text-sm'
+                }
               >
                 หมวดที่ {cat.code} · {cat.name_th}
               </h2>
               <table
-                className={`w-full border-collapse text-base ${pdfCompact ? 'text-[7.5px] leading-tight' : compact ? 'print:text-[7.5px] print:leading-tight' : 'print:text-xs'}`}
+                className={
+                  pdfCompact
+                    ? 'w-full border-collapse text-[11px] leading-snug'
+                    : compact
+                      ? 'w-full border-collapse text-base print:text-[7.5px] print:leading-tight'
+                      : 'w-full border-collapse text-base print:text-xs'
+                }
               >
                 <thead>
                   <tr
-                    className={`border-b border-dotted border-slate-300 text-left text-sm text-slate-800 ${pdfCompact ? 'text-[7px]' : compact ? 'print:text-[7px]' : 'print:text-[11px]'}`}
+                    className={
+                      pdfCompact
+                        ? 'border-b border-dotted border-slate-300 text-left text-[10px] text-slate-800'
+                        : compact
+                          ? 'border-b border-dotted border-slate-300 text-left text-sm text-slate-800 print:text-[7px]'
+                          : 'border-b border-dotted border-slate-300 text-left text-sm text-slate-800 print:text-[11px]'
+                    }
                   >
-                    <th className={`py-1 pr-2 ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>หัวข้อ</th>
-                    <th className={`w-[17%] py-1 pr-2 text-center ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>มาตรฐานพื้นฐาน</th>
-                    <th className={`w-[17%] py-1 pr-2 text-center ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>การพัฒนาต่อเนื่อง</th>
+                    <th className={`pr-2 ${pdfCompact ? 'py-0' : compact ? 'py-1 print:py-0' : 'py-1 print:py-1'}`}>หัวข้อ</th>
+                    <th className={`w-[17%] pr-2 text-center ${pdfCompact ? 'py-0' : compact ? 'py-1 print:py-0' : 'py-1 print:py-1'}`}>
+                      มาตรฐานพื้นฐาน
+                    </th>
+                    <th className={`w-[17%] pr-2 text-center ${pdfCompact ? 'py-0' : compact ? 'py-1 print:py-0' : 'py-1 print:py-1'}`}>
+                      การพัฒนาต่อเนื่อง
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -503,18 +546,24 @@ export default function Report() {
                     return (
                       <Fragment key={t.id}>
                         <tr className="border-b border-dotted border-slate-300">
-                          <td className={`flex gap-1 py-1 pr-2 ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>
+                          <td className={`flex gap-1 pr-2 ${pdfCompact ? 'py-0' : compact ? 'py-1 print:py-0' : 'py-1 print:py-1'}`}>
                             <span
-                              className={`shrink-0 font-mono text-sm text-[#2E74B5] ${pdfCompact ? 'text-[7px]' : compact ? 'print:text-[7px]' : 'print:text-[10px]'}`}
+                              className={
+                                pdfCompact
+                                  ? 'shrink-0 font-mono text-[10px] text-[#2E74B5]'
+                                  : compact
+                                    ? 'shrink-0 font-mono text-sm text-[#2E74B5] print:text-[7px]'
+                                    : 'shrink-0 font-mono text-sm text-[#2E74B5] print:text-[10px]'
+                              }
                             >
                               {t.code}
                             </span>
                             <span>{t.name_th}</span>
                           </td>
-                          <td className={`w-[17%] py-1 pr-2 text-center ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>
+                          <td className={`w-[17%] pr-2 text-center ${pdfCompact ? 'py-0' : compact ? 'py-1 print:py-0' : 'py-1 print:py-1'}`}>
                             {agg?.mustPassFinal === null || agg?.mustPassFinal === undefined ? '-' : agg.mustPassFinal ? 'ผ่าน' : 'ไม่ผ่าน'}
                           </td>
-                          <td className={`w-[17%] py-1 pr-2 text-center font-semibold ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>
+                          <td className={`w-[17%] pr-2 text-center font-semibold ${pdfCompact ? 'py-0' : compact ? 'py-1 print:py-0' : 'py-1 print:py-1'}`}>
                             {formatAvg(agg?.avgScore ?? null)}
                           </td>
                         </tr>
@@ -574,9 +623,13 @@ export default function Report() {
                     )
                   })}
                   <tr className="font-semibold text-slate-800">
-                    <td className={`py-1 pr-2 ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>รวม</td>
-                    <td className={`w-[17%] py-1 pr-2 text-center ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>{catPass ? 'ผ่าน' : 'ไม่ผ่าน'}</td>
-                    <td className={`w-[17%] py-1 pr-2 text-center ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>{catTotal.toFixed(1)}</td>
+                    <td className={`pr-2 ${pdfCompact ? 'py-0' : compact ? 'py-1 print:py-0' : 'py-1 print:py-1'}`}>รวม</td>
+                    <td className={`w-[17%] pr-2 text-center ${pdfCompact ? 'py-0' : compact ? 'py-1 print:py-0' : 'py-1 print:py-1'}`}>
+                      {catPass ? 'ผ่าน' : 'ไม่ผ่าน'}
+                    </td>
+                    <td className={`w-[17%] pr-2 text-center ${pdfCompact ? 'py-0' : compact ? 'py-1 print:py-0' : 'py-1 print:py-1'}`}>
+                      {catTotal.toFixed(1)}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -606,27 +659,39 @@ export default function Report() {
       )}
 
       <div className="break-inside-avoid">
-        <div className={`mb-8 px-4 py-7 text-center print:mb-4 print:py-4 ${pdfSummaryCapture ? 'mb-1 py-1' : ''}`}>
-          <p className={`text-base font-bold text-slate-800 print:text-[10px] ${pdfSummaryCapture ? 'text-[10px]' : ''}`}>สรุปผลการประเมินภาพรวม</p>
+        <div className={pdfSummaryCapture ? 'mb-1 px-4 py-1 text-center' : 'mb-8 px-4 py-7 text-center print:mb-4 print:py-4'}>
+          <p className={pdfSummaryCapture ? 'text-[12px] font-bold text-slate-800' : 'text-base font-bold text-slate-800 print:text-[10px]'}>
+            สรุปผลการประเมินภาพรวม
+          </p>
           <p
-            className={`mt-1 text-3xl font-bold print:text-base ${pdfSummaryCapture ? 'text-base' : ''} ${overallPass ? 'text-emerald-600' : 'text-red-600'}`}
+            className={`font-bold ${pdfSummaryCapture ? 'mt-0.5 text-[18px]' : 'mt-1 text-3xl print:text-base'} ${overallPass ? 'text-emerald-600' : 'text-red-600'}`}
           >
             {overallPass ? 'ผ่านเกณฑ์ทุกข้อ' : `ผ่าน ${flatTopics.length - mustFailTopics.length} ข้อ ต้องพัฒนา ${mustFailTopics.length} ข้อ`}
           </p>
-          <p className={`mt-1 text-base font-semibold text-slate-800 print:text-[10px] ${pdfSummaryCapture ? 'text-[10px]' : ''}`}>
+          <p
+            className={
+              pdfSummaryCapture
+                ? 'mt-0.5 text-[12px] font-semibold text-slate-800'
+                : 'mt-1 text-base font-semibold text-slate-800 print:text-[10px]'
+            }
+          >
             {Math.round(grandTotal)} คะแนน{maxTotal > 0 ? ` (${Math.round((grandTotal / maxTotal) * 100)}%)` : ''}
           </p>
         </div>
 
         <div
-          className={`grid grid-cols-2 gap-8 pt-8 text-center text-base print:gap-6 print:pt-0 print:text-[10px] ${pdfSummaryCapture ? 'gap-6 pt-0 text-[10px]' : ''}`}
+          className={
+            pdfSummaryCapture
+              ? 'grid grid-cols-2 gap-6 pt-4 text-center text-[11px]'
+              : 'grid grid-cols-2 gap-8 pt-8 text-center text-base print:gap-6 print:pt-0 print:text-[10px]'
+          }
         >
           <div>
-            <p className={`mb-8 print:mb-4 ${pdfSummaryCapture ? 'mb-4' : ''}`}>ลงชื่อ .............................................</p>
+            <p className={pdfSummaryCapture ? 'mb-4' : 'mb-8 print:mb-4'}>ลงชื่อ .............................................</p>
             <p>ประธานคณะกรรมการประเมิน</p>
           </div>
           <div>
-            <p className={`mb-8 print:mb-4 ${pdfSummaryCapture ? 'mb-4' : ''}`}>ลงชื่อ .............................................</p>
+            <p className={pdfSummaryCapture ? 'mb-4' : 'mb-8 print:mb-4'}>ลงชื่อ .............................................</p>
             <p>ผู้อำนวยการหน่วยบริการ</p>
           </div>
         </div>
