@@ -1,7 +1,10 @@
 import { supabase } from './supabaseClient'
 
-export async function renameParticipant(id: string, name: string): Promise<void> {
-  const { error } = await supabase.from('participants').update({ name }).eq('id', id)
+export async function updateParticipantDetails(id: string, name: string, civilServiceLevel: string): Promise<void> {
+  const { error } = await supabase
+    .from('participants')
+    .update({ name, civil_service_level: civilServiceLevel.trim() || null })
+    .eq('id', id)
   if (error) throw error
 }
 

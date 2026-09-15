@@ -1,5 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { jsPDF } from 'jspdf'
+import html2canvas from 'html2canvas-pro'
 import { supabase } from '../lib/supabaseClient'
 import { loadStandardByVersionId, allTopicsFlat } from '../lib/loadStandard'
 import { fetchScoresForRound } from '../lib/scoresApi'
@@ -85,9 +87,9 @@ const ITEM_LEVEL_LABEL: Record<(typeof ITEM_LEVEL_ORDER)[number], string> = {
 function CommentLine({ entry }: { entry: CommentEntry }) {
   return (
     <div>
-      <p className="text-[11.5px] text-slate-400">ความคิดเห็น :</p>
-      <p className="whitespace-pre-line text-[11.5px] font-semibold text-slate-800">{entry.text}</p>
-      <p className="text-[10px] text-slate-400">
+      <p className="text-sm text-slate-400">ความคิดเห็น :</p>
+      <p className="whitespace-pre-line text-sm font-semibold text-slate-800">{entry.text}</p>
+      <p className="text-xs text-slate-400">
         โดย : {entry.author}
         {entry.time ? ` ${entry.time}` : ''}
       </p>
@@ -99,7 +101,7 @@ function CommentLine({ entry }: { entry: CommentEntry }) {
 // to the item text instead of stacked below each comment.
 function ItemCheckedBadge({ checked }: { checked: boolean }) {
   return (
-    <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold text-white ${checked ? 'bg-emerald-500' : 'bg-red-400'}`}>
+    <span className={`shrink-0 rounded-full px-2.5 py-1 text-sm font-bold text-white ${checked ? 'bg-emerald-500' : 'bg-red-400'}`}>
       {checked ? 'ใช่' : 'ไม่'}
     </span>
   )
@@ -168,14 +170,6 @@ export default function Report() {
     }
   }, [roundId])
 
-  useEffect(() => {
-    function resetAfterPrint() {
-      setPrintMode('summary')
-    }
-    window.addEventListener('afterprint', resetAfterPrint)
-    return () => window.removeEventListener('afterprint', resetAfterPrint)
-  }, [])
-
   // The logo (and any evidence photos in the detailed report) are fetched
   // over the network, so without this the print dialog/PDF can capture the
   // page before those images have actually finished loading and render
@@ -197,26 +191,63 @@ export default function Report() {
     })
   }
 
-  async function triggerPrint(mode: 'summary' | 'detailed') {
-    setPrintMode(mode)
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-    if (printAreaRef.current) await waitForImages(printAreaRef.current)
-    window.print()
-  }
+  const [exportingPdf, setExportingPdf] = useState<'summary' | 'detailed' | null>(null)
 
-  function printDetailed() {
-    triggerPrint('detailed')
-  }
+  // Renders the on-screen report (not the compact print stylesheet) straight
+  // to a PDF file and downloads it, so evaluators don't have to go through
+  // the browser's print dialog and manually pick "Save as PDF".
+  async function exportPdf(mode: 'summary' | 'detailed') {
+    if (!round) return
+    setExportingPdf(mode)
+    try {
+      setPrintMode(mode)
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      const el = printAreaRef.current
+      if (!el) return
+      await waitForImages(el)
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        backgroundColor: '#f8fafc',
+        useCORS: true,
+        ignoreElements: (node) => (node as HTMLElement).classList?.contains('no-print'),
+      })
+      const imgData = canvas.toDataURL('image/jpeg', 0.95)
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const fullWidth = pageWidth
+      const fullHeight = (canvas.height * fullWidth) / canvas.width
 
-  function printSummary() {
-    triggerPrint('summary')
+      if (mode === 'summary') {
+        // The overview report should always read as one page, so shrink it
+        // to fit the page height instead of spilling onto a second sheet.
+        const scale = Math.min(1, pageHeight / fullHeight)
+        const imgWidth = fullWidth * scale
+        const imgHeight = fullHeight * scale
+        pdf.addImage(imgData, 'JPEG', (pageWidth - imgWidth) / 2, 0, imgWidth, imgHeight)
+      } else {
+        let heightLeft = fullHeight
+        let position = 0
+        pdf.addImage(imgData, 'JPEG', 0, position, fullWidth, fullHeight)
+        heightLeft -= pageHeight
+        while (heightLeft > 0) {
+          position -= pageHeight
+          pdf.addPage()
+          pdf.addImage(imgData, 'JPEG', 0, position, fullWidth, fullHeight)
+          heightLeft -= pageHeight
+        }
+      }
+      pdf.save(`pcu-report-${round.join_code}-${mode}.pdf`)
+    } finally {
+      setExportingPdf(null)
+      setPrintMode('summary')
+    }
   }
 
   useEffect(() => {
     if (loading) return
     const autoPrint = searchParams.get('print')
-    if (autoPrint === 'summary') printSummary()
-    else if (autoPrint === 'detailed') printDetailed()
+    if (autoPrint === 'summary' || autoPrint === 'detailed') exportPdf(autoPrint)
     if (autoPrint) {
       const next = new URLSearchParams(searchParams)
       next.delete('print')
@@ -291,23 +322,28 @@ export default function Report() {
   if (!round || !standard) return <div className="flex min-h-screen items-center justify-center text-red-600">ไม่พบรอบการประเมิน</div>
 
   const grandTotal = flatTopics.reduce((sum, t) => sum + (aggregates.get(t.id)?.avgScore ?? 0), 0)
+  const maxTotal = flatTopics.length * 2
   const mustFailTopics = flatTopics.filter((t) => aggregates.get(t.id)?.mustPassFinal === false)
   const overallPass = mustFailTopics.length === 0
+  // While exportPdf('summary') is capturing the page, apply the same
+  // compact sizing the print stylesheet uses (html2canvas doesn't see
+  // @media print) so the one-page overview PDF actually fits one page.
+  const pdfSummaryCapture = exportingPdf === 'summary'
 
   return (
-    <div ref={printAreaRef} className="mx-auto max-w-3xl px-6 py-8 print:px-0 print:py-0">
+    <div ref={printAreaRef} className={`mx-auto max-w-3xl px-6 py-8 print:px-0 print:py-0 ${pdfSummaryCapture ? 'px-0 py-1' : ''}`}>
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-2">
-          <Link to={`/round/${roundId}/score`} className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600">
+          <Link to={`/round/${roundId}/score`} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600">
             ← กลับสู่การประเมิน
           </Link>
-          <Link to="/admin" className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600">
+          <Link to="/admin" className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600">
             ไปหน้าแอดมิน
           </Link>
           {round.scoring_mode === 'collaborative' && auditLog.length > 0 && (
             <button
               onClick={() => setShowAuditLog((v) => !v)}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600"
+              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600"
             >
               {showAuditLog ? 'ซ่อนประวัติการแก้ไข' : 'ดูประวัติการแก้ไข'}
             </button>
@@ -317,10 +353,14 @@ export default function Report() {
 
       <div className="no-print mb-6 flex flex-wrap gap-3">
         <div className="rounded-xl border border-slate-200 p-3">
-          <p className="mb-2 text-xs font-semibold text-slate-400">สรุปภาพรวม</p>
+          <p className="mb-2 text-sm font-semibold text-slate-400">สรุปภาพรวม</p>
           <div className="flex gap-2">
-            <button onClick={printSummary} className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white">
-              PDF
+            <button
+              onClick={() => exportPdf('summary')}
+              disabled={exportingPdf !== null}
+              className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {exportingPdf === 'summary' ? 'กำลังสร้าง...' : 'PDF'}
             </button>
             <button
               onClick={() => exportDocx(false)}
@@ -336,7 +376,7 @@ export default function Report() {
         </div>
 
         <div className="rounded-xl border border-slate-200 p-3">
-          <p className="mb-2 text-xs font-semibold text-slate-400">แบบละเอียด (มี comment + รูป)</p>
+          <p className="mb-2 text-sm font-semibold text-slate-400">แบบละเอียด (มี comment + รูป)</p>
           <div className="flex gap-2">
             <button
               onClick={() => setPrintMode((m) => (m === 'detailed' ? 'summary' : 'detailed'))}
@@ -344,8 +384,12 @@ export default function Report() {
             >
               {printMode === 'detailed' ? 'กำลังดูในหน้าเว็บ' : 'ดูในหน้าเว็บ'}
             </button>
-            <button onClick={printDetailed} className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white">
-              PDF
+            <button
+              onClick={() => exportPdf('detailed')}
+              disabled={exportingPdf !== null}
+              className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {exportingPdf === 'detailed' ? 'กำลังสร้าง...' : 'PDF'}
             </button>
             <button
               onClick={() => exportDocx(true)}
@@ -358,13 +402,13 @@ export default function Report() {
         </div>
       </div>
 
-      <div className="mb-6 text-center print:mb-8">
-        <BrandLogo className="mx-auto mb-3 h-[83px] w-auto object-contain print:mb-1 print:h-11" />
-        <h1 className="text-xl font-bold text-slate-800 print:text-sm">รายงานผลการประเมินมาตรฐานหน่วยบริการปฐมภูมิ</h1>
-        <p className="text-sm text-slate-500 print:text-[10px]">{standard.standardVersion.name}</p>
+      <div className={`mb-6 text-center print:mb-8 ${pdfSummaryCapture ? 'mb-1' : ''}`}>
+        <BrandLogo className={`mx-auto mb-3 h-[83px] w-auto object-contain print:mb-1 print:h-11 ${pdfSummaryCapture ? 'mb-1 h-11' : ''}`} />
+        <h1 className={`text-2xl font-bold text-slate-800 print:text-sm ${pdfSummaryCapture ? 'text-sm' : ''}`}>รายงานผลการประเมินมาตรฐานหน่วยบริการปฐมภูมิ</h1>
+        <p className={`text-base text-slate-500 print:text-[10px] ${pdfSummaryCapture ? 'text-[10px]' : ''}`}>{standard.standardVersion.name}</p>
       </div>
 
-      <table className="mb-6 w-full border-collapse text-sm print:mb-8 print:text-[9.5px]">
+      <table className={`mb-6 w-full border-collapse text-base print:mb-8 print:text-[9.5px] ${pdfSummaryCapture ? 'mb-1 text-[9.5px]' : ''}`}>
         <tbody>
           <tr className="border-b border-dotted border-slate-300">
             <td className="w-[28%] py-1 pr-2 align-top font-semibold text-slate-700">หน่วยบริการ</td>
@@ -386,7 +430,24 @@ export default function Report() {
           </tr>
           <tr>
             <td className="py-1 pr-2 align-top font-semibold text-slate-700">คณะกรรมการผู้ประเมิน</td>
-            <td className="py-1">{evaluators.map((e) => e.name).join(', ') || '-'}</td>
+            <td className="py-1">
+              {evaluators.length > 0 ? (
+                <table className="w-full border-collapse">
+                  <tbody>
+                    {evaluators.map((e, i) => (
+                      <tr key={e.id}>
+                        <td className="py-0.5 pr-3 align-top">
+                          {i + 1}. {e.name}
+                        </td>
+                        <td className="py-0.5 align-top text-slate-500">{e.civil_service_level || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                '-'
+              )}
+            </td>
           </tr>
         </tbody>
       </table>
@@ -397,17 +458,28 @@ export default function Report() {
           const catTotal = catTopics.reduce((sum, t) => sum + (aggregates.get(t.id)?.avgScore ?? 0), 0)
           const catPass = catTopics.every((t) => aggregates.get(t.id)?.mustPassFinal !== false)
           const compact = printMode === 'summary'
+          // Captured for the one-page overview PDF: html2canvas can't see
+          // @media print, so while exportPdf('summary') is running these
+          // apply the same compact sizing the print stylesheet uses, as
+          // plain classes instead of print:-gated ones.
+          const pdfCompact = compact && exportingPdf === 'summary'
           return (
-            <div key={cat.id} className={`mb-6 break-inside-avoid ${compact ? 'print:mb-1' : 'print:mb-6'}`}>
-              <h2 className={`mb-2 text-sm font-bold text-[#2E74B5] ${compact ? 'print:mb-0.5 print:text-[9px]' : 'print:text-sm'}`}>
+            <div key={cat.id} className={`mb-6 break-inside-avoid ${pdfCompact ? 'mb-1' : compact ? 'print:mb-1' : 'print:mb-6'}`}>
+              <h2
+                className={`mb-2 text-base font-bold text-[#2E74B5] ${pdfCompact ? 'mb-0.5 text-[9px]' : compact ? 'print:mb-0.5 print:text-[9px]' : 'print:text-sm'}`}
+              >
                 หมวดที่ {cat.code} · {cat.name_th}
               </h2>
-              <table className={`w-full border-collapse text-sm ${compact ? 'print:text-[7.5px] print:leading-tight' : 'print:text-xs'}`}>
+              <table
+                className={`w-full border-collapse text-base ${pdfCompact ? 'text-[7.5px] leading-tight' : compact ? 'print:text-[7.5px] print:leading-tight' : 'print:text-xs'}`}
+              >
                 <thead>
-                  <tr className={`border-b border-dotted border-slate-300 text-left text-xs text-slate-800 ${compact ? 'print:text-[7px]' : 'print:text-[11px]'}`}>
-                    <th className={`py-1 pr-2 ${compact ? 'print:py-0' : 'print:py-1'}`}>หัวข้อ</th>
-                    <th className={`w-[17%] py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>มาตรฐานพื้นฐาน</th>
-                    <th className={`w-[17%] py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>การพัฒนาต่อเนื่อง</th>
+                  <tr
+                    className={`border-b border-dotted border-slate-300 text-left text-sm text-slate-800 ${pdfCompact ? 'text-[7px]' : compact ? 'print:text-[7px]' : 'print:text-[11px]'}`}
+                  >
+                    <th className={`py-1 pr-2 ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>หัวข้อ</th>
+                    <th className={`w-[17%] py-1 pr-2 text-center ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>มาตรฐานพื้นฐาน</th>
+                    <th className={`w-[17%] py-1 pr-2 text-center ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>การพัฒนาต่อเนื่อง</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -431,31 +503,37 @@ export default function Report() {
                     return (
                       <Fragment key={t.id}>
                         <tr className="border-b border-dotted border-slate-300">
-                          <td className={`py-1 pr-2 ${compact ? 'print:py-0' : 'print:py-1'}`}>
-                            <span className={`font-mono text-xs text-[#2E74B5] ${compact ? 'print:text-[7px]' : 'print:text-[10px]'}`}>{t.code}</span>{' '}
-                            {t.name_th}
+                          <td className={`flex gap-1 py-1 pr-2 ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>
+                            <span
+                              className={`shrink-0 font-mono text-sm text-[#2E74B5] ${pdfCompact ? 'text-[7px]' : compact ? 'print:text-[7px]' : 'print:text-[10px]'}`}
+                            >
+                              {t.code}
+                            </span>
+                            <span>{t.name_th}</span>
                           </td>
-                          <td className={`w-[17%] py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>
+                          <td className={`w-[17%] py-1 pr-2 text-center ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>
                             {agg?.mustPassFinal === null || agg?.mustPassFinal === undefined ? '-' : agg.mustPassFinal ? 'ผ่าน' : 'ไม่ผ่าน'}
                           </td>
-                          <td className={`w-[17%] py-1 pr-2 text-center font-semibold ${compact ? 'print:py-0' : 'print:py-1'}`}>{formatAvg(agg?.avgScore ?? null)}</td>
+                          <td className={`w-[17%] py-1 pr-2 text-center font-semibold ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>
+                            {formatAvg(agg?.avgScore ?? null)}
+                          </td>
                         </tr>
                         {hasDetail && (
                           <tr className="break-inside-avoid border-b border-dotted border-slate-300">
-                            <td colSpan={3} className="bg-slate-50 px-3 py-2 align-top text-xs text-slate-600 print:text-[11px]">
+                            <td colSpan={3} className="bg-slate-50 px-3 py-2 align-top text-sm text-slate-600 print:text-[11px]">
                               {levelGroups.map(({ level, items }) => (
                                 <div key={level} className="mt-1.5 first:mt-0">
-                                  <p className="text-[11px] font-semibold text-slate-500">{ITEM_LEVEL_LABEL[level]}</p>
+                                  <p className="text-sm font-semibold text-slate-500">{ITEM_LEVEL_LABEL[level]}</p>
                                   <div className="ml-1 space-y-1.5 border-l-2 border-slate-200 pl-2 pt-1">
                                     {items.map(({ item, detail, itemPhotos }) => (
                                       <div key={item.id} className="flex items-start gap-2">
                                         {detail.checkedFinal !== null ? (
                                           <ItemCheckedBadge checked={detail.checkedFinal} />
                                         ) : (
-                                          <span className="shrink-0 rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-500">ยังไม่ประเมิน</span>
+                                          <span className="shrink-0 rounded-full bg-slate-200 px-2.5 py-1 text-sm font-bold text-slate-500">ยังไม่ประเมิน</span>
                                         )}
                                         <div className="min-w-0 flex-1">
-                                          <p className="text-[13px] font-medium text-slate-700">{item.item_text}</p>
+                                          <p className="text-base font-medium text-slate-700">{item.item_text}</p>
                                           {detail.comments.length > 0 && (
                                             <div className="mt-1 space-y-1.5 rounded-md border border-sky-200 bg-sky-50 p-2">
                                               {detail.comments.map((e, i) => (
@@ -496,9 +574,9 @@ export default function Report() {
                     )
                   })}
                   <tr className="font-semibold text-slate-800">
-                    <td className={`py-1 pr-2 ${compact ? 'print:py-0' : 'print:py-1'}`}>รวม</td>
-                    <td className={`w-[17%] py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>{catPass ? 'ผ่าน' : 'ไม่ผ่าน'}</td>
-                    <td className={`w-[17%] py-1 pr-2 text-center ${compact ? 'print:py-0' : 'print:py-1'}`}>{catTotal.toFixed(1)}</td>
+                    <td className={`py-1 pr-2 ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>รวม</td>
+                    <td className={`w-[17%] py-1 pr-2 text-center ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>{catPass ? 'ผ่าน' : 'ไม่ผ่าน'}</td>
+                    <td className={`w-[17%] py-1 pr-2 text-center ${pdfCompact ? 'py-0' : compact ? 'print:py-0' : 'print:py-1'}`}>{catTotal.toFixed(1)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -528,21 +606,27 @@ export default function Report() {
       )}
 
       <div className="break-inside-avoid">
-        <div className="mb-8 px-4 py-7 text-center print:mb-4 print:py-4">
-          <p className="text-sm font-bold text-slate-800 print:text-[10px]">สรุปผลการประเมินภาพรวม</p>
-          <p className={`mt-1 text-2xl font-bold print:text-base ${overallPass ? 'text-emerald-600' : 'text-red-600'}`}>
+        <div className={`mb-8 px-4 py-7 text-center print:mb-4 print:py-4 ${pdfSummaryCapture ? 'mb-1 py-1' : ''}`}>
+          <p className={`text-base font-bold text-slate-800 print:text-[10px] ${pdfSummaryCapture ? 'text-[10px]' : ''}`}>สรุปผลการประเมินภาพรวม</p>
+          <p
+            className={`mt-1 text-3xl font-bold print:text-base ${pdfSummaryCapture ? 'text-base' : ''} ${overallPass ? 'text-emerald-600' : 'text-red-600'}`}
+          >
             {overallPass ? 'ผ่านเกณฑ์ทุกข้อ' : `ผ่าน ${flatTopics.length - mustFailTopics.length} ข้อ ต้องพัฒนา ${mustFailTopics.length} ข้อ`}
           </p>
-          <p className="mt-1 text-sm font-semibold text-slate-800 print:text-[10px]">{Math.round(grandTotal)} คะแนน</p>
+          <p className={`mt-1 text-base font-semibold text-slate-800 print:text-[10px] ${pdfSummaryCapture ? 'text-[10px]' : ''}`}>
+            {Math.round(grandTotal)} คะแนน{maxTotal > 0 ? ` (${Math.round((grandTotal / maxTotal) * 100)}%)` : ''}
+          </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-8 pt-8 text-center text-sm print:gap-6 print:pt-0 print:text-[10px]">
+        <div
+          className={`grid grid-cols-2 gap-8 pt-8 text-center text-base print:gap-6 print:pt-0 print:text-[10px] ${pdfSummaryCapture ? 'gap-6 pt-0 text-[10px]' : ''}`}
+        >
           <div>
-            <p className="mb-8 print:mb-4">ลงชื่อ .............................................</p>
+            <p className={`mb-8 print:mb-4 ${pdfSummaryCapture ? 'mb-4' : ''}`}>ลงชื่อ .............................................</p>
             <p>ประธานคณะกรรมการประเมิน</p>
           </div>
           <div>
-            <p className="mb-8 print:mb-4">ลงชื่อ .............................................</p>
+            <p className={`mb-8 print:mb-4 ${pdfSummaryCapture ? 'mb-4' : ''}`}>ลงชื่อ .............................................</p>
             <p>ผู้อำนวยการหน่วยบริการ</p>
           </div>
         </div>

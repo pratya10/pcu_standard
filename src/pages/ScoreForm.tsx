@@ -446,11 +446,11 @@ export default function ScoreForm() {
             <button
               type="button"
               onClick={() => toggleExpanded(top.id)}
-              className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs font-medium ${active ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}
+              className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs font-medium ${active ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
             >
               <NavDot color={top.color} complete={isComplete(summary, topicsForSummary.length)} />
               <span className="flex-1 truncate">{top.navLabel}</span>
-              <span className="text-slate-300">{isOpen ? '▾' : '▸'}</span>
+              <span className={active ? 'text-blue-200' : 'text-slate-300'}>{isOpen ? '▾' : '▸'}</span>
             </button>
             {isOpen && (
               <div className="ml-3 flex flex-col gap-1 border-l border-slate-100 pl-2">
@@ -464,11 +464,11 @@ export default function ScoreForm() {
                           <button
                             type="button"
                             onClick={() => toggleExpanded(sub.id)}
-                            className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs font-medium ${subActive ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'}`}
+                            className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs font-medium ${subActive ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
                           >
                             <NavDot color={sub.color} complete={isComplete(subSummary, sub.topics.length)} />
                             <span className="flex-1 truncate">{sub.navLabel}</span>
-                            <span className="text-slate-300">{subOpen ? '▾' : '▸'}</span>
+                            <span className={subActive ? 'text-blue-200' : 'text-slate-300'}>{subOpen ? '▾' : '▸'}</span>
                           </button>
                           {subOpen && (
                             <div className="ml-3 flex flex-col border-l border-slate-100 pl-2">

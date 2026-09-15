@@ -6,7 +6,7 @@ import type { AssessmentRound, Facility, Participant } from '../types'
 import AdminLayout from '../components/AdminLayout'
 import { formatThaiDate } from '../lib/thaiDate'
 import { useConfirm } from '../components/ConfirmProvider'
-import { mergeParticipants, renameParticipant } from '../lib/participantsApi'
+import { mergeParticipants, updateParticipantDetails } from '../lib/participantsApi'
 
 export default function AdminRoundDetail() {
   const { roundId } = useParams<{ roundId: string }>()
@@ -26,6 +26,7 @@ export default function AdminRoundDetail() {
   const [codeError, setCodeError] = useState<string | null>(null)
   const [editingParticipantId, setEditingParticipantId] = useState<string | null>(null)
   const [editParticipantName, setEditParticipantName] = useState('')
+  const [editParticipantLevel, setEditParticipantLevel] = useState('')
   const [mergingParticipantId, setMergingParticipantId] = useState<string | null>(null)
   const [mergeTargetId, setMergeTargetId] = useState('')
   const [merging, setMerging] = useState(false)
@@ -79,13 +80,14 @@ export default function AdminRoundDetail() {
   function startEditParticipant(p: Participant) {
     setEditingParticipantId(p.id)
     setEditParticipantName(p.name)
+    setEditParticipantLevel(p.civil_service_level ?? '')
   }
 
   async function saveParticipantName() {
     if (!editingParticipantId || !editParticipantName.trim()) return
     setUpdating(true)
     try {
-      await renameParticipant(editingParticipantId, editParticipantName.trim())
+      await updateParticipantDetails(editingParticipantId, editParticipantName.trim(), editParticipantLevel)
       await load()
       setEditingParticipantId(null)
     } catch (err) {
@@ -360,12 +362,19 @@ export default function AdminRoundDetail() {
           <div key={p.id} className="border-b border-slate-100 px-4 py-2 text-sm last:border-0">
             <div className="flex items-center justify-between">
               {editingParticipantId === p.id ? (
-                <div className="flex flex-1 items-center gap-2">
+                <div className="flex flex-1 flex-wrap items-center gap-2">
                   <input
                     value={editParticipantName}
                     onChange={(e) => setEditParticipantName(e.target.value)}
                     autoFocus
-                    className="flex-1 rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                    placeholder="ชื่อ-สกุล"
+                    className="min-w-[10rem] flex-1 rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                  />
+                  <input
+                    value={editParticipantLevel}
+                    onChange={(e) => setEditParticipantLevel(e.target.value)}
+                    placeholder="วิชาชีพ/ตำแหน่ง เช่น ชำนาญการพิเศษ"
+                    className="min-w-[10rem] flex-1 rounded-lg border border-slate-300 px-2 py-1 text-sm"
                   />
                   <button
                     onClick={saveParticipantName}
@@ -383,13 +392,14 @@ export default function AdminRoundDetail() {
                   <span className="font-medium text-slate-800">{p.name}</span>{' '}
                   <span className="text-xs text-slate-400">
                     {p.role === 'evaluator' ? 'กรรมการประเมิน' : p.role === 'viewer' ? 'ผู้สังเกตการณ์' : 'ประธาน'}
+                    {p.civil_service_level ? ` · ${p.civil_service_level}` : ''}
                   </span>
                 </div>
               )}
               {editingParticipantId !== p.id && (
                 <div className="flex shrink-0 items-center gap-3">
                   <button onClick={() => startEditParticipant(p)} className="text-xs text-emerald-700 hover:underline">
-                    แก้ไขชื่อ
+                    แก้ไขชื่อ/ตำแหน่ง
                   </button>
                   {participants.length > 1 && (
                     <button onClick={() => startMergeParticipant(p)} className="text-xs text-sky-700 hover:underline">
