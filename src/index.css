@@ -19,6 +19,29 @@ body {
   color: #1f2430;
 }
 
+:root {
+  --guide-marker: #b91c1c;
+  --scroll-thumb: #94a3b8;
+  --scroll-track: #f1f5f9;
+  --scroll-hover: #64748b;
+  --scroll-active: #475569;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+  scrollbar-width: auto;
+}
+* { scrollbar-color: var(--scroll-thumb) var(--scroll-track); }
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--scroll-track); }
+::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 8px; border: 2px solid var(--scroll-track); }
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-hover); }
+::-webkit-scrollbar-thumb:active { background: var(--scroll-active); }
+.guide-link { display: inline-block; border: 1px solid var(--color-emerald-600); border-radius: var(--radius-xl); padding: .65rem 1rem; color: var(--color-emerald-800); background: white; text-align: center; font-weight: 600; cursor: pointer; }
+.guide-link:hover { background: var(--color-emerald-50); }
+.guide-link:active { background: var(--color-emerald-100); }
+.guide-link:focus-visible, .guide-image-link:focus-visible, .guide-page a:focus-visible { outline: 3px solid var(--color-emerald-600); outline-offset: 4px; }
+.guide-number { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; border: 3px solid var(--guide-marker); border-radius: 50%; color: var(--guide-marker); background: white; font-weight: 800; }
+@media (forced-colors: active) { * { scrollbar-color: auto; } .guide-number { border-color: CanvasText; color: CanvasText; } }
+@media print { .guide-lesson { break-inside: avoid; margin-bottom: 1rem; } .guide-page { max-width: none; padding: 0; } .guide-page img { max-height: 140mm; object-fit: contain; } }
+
 .material-symbols-outlined {
   font-family: 'Material Symbols Outlined';
   font-weight: normal;

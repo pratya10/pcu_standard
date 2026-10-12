@@ -6,6 +6,7 @@ import { searchCommitteeMembers, updateCommitteeMember } from '../lib/committeeS
 import { useConfirm } from '../components/ConfirmProvider'
 import VersionFooter from '../components/VersionFooter'
 import BrandLogo from '../components/BrandLogo'
+import GuideLink from '../components/GuideLink'
 import type { CommitteeMember, ParticipantRole } from '../types'
 
 function DiffRow({ label, oldValue, newValue }: { label: string; oldValue: string; newValue: string }) {
@@ -291,6 +292,7 @@ export default function Join() {
         </button>
       </form>
 
+      <div className="mt-5"><GuideLink section="join" /></div>
       <VersionFooter />
     </div>
   )
