@@ -11,6 +11,7 @@ import type { AssessmentRound, Facility, FullStandard, Participant, Score, TeamS
 import TopicScoreCard from '../components/TopicScoreCard'
 import TeamTopicScoreCard from '../components/TeamTopicScoreCard'
 import Icon from '../components/Icon'
+import GuideLink from '../components/GuideLink'
 import { formatThaiDate } from '../lib/thaiDate'
 
 type SectionTopic = FullStandard['categories'][number]['topics'][number]
@@ -488,6 +489,7 @@ export default function ScoreForm() {
       })}
 
       <div className="mt-3 flex flex-col gap-1 border-t border-slate-100 pt-3">
+        <GuideLink section="score" />
         <Link to={`/round/${roundId}/live`} className="rounded-lg px-2 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50">
           ดูคะแนนรวม (Real-time)
         </Link>

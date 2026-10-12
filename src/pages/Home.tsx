@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
+import GuideLink from '../components/GuideLink'
 
 export default function Home() {
   return (
@@ -17,6 +18,8 @@ export default function Home() {
         <span className="block text-xl font-bold">เข้าร่วมประเมิน</span>
         <span className="block text-sm font-medium text-emerald-50">(กรรมการ และ ผู้สังเกตการณ์)</span>
       </Link>
+
+      <GuideLink />
 
       <Link
         to="/history"

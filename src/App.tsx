@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import Home from './pages/Home'
+import UserGuide from './pages/UserGuide'
 import Join from './pages/Join'
 import AdminLogin from './pages/AdminLogin'
 import AdminDashboard from './pages/AdminDashboard'
@@ -23,6 +24,7 @@ export default function App() {
       <BrowserRouter basename="/pcustandard71">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/guide" element={<UserGuide />} />
           <Route path="/join" element={<Join />} />
           <Route path="/history" element={<PublicHistory />} />
 
