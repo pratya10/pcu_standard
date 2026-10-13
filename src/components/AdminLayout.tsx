@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { to: '/admin/committee', label: 'คณะกรรมการ' },
   { to: '/admin/users', label: 'ผู้ดูแลระบบ' },
   { to: '/admin/settings', label: 'ตั้งค่า' },
+  { to: '/documents', label: 'เอกสารการประเมิน' },
   { to: '/guide#admin', label: 'วิธีใช้งาน' },
 ]
 
