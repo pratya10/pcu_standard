@@ -29,10 +29,7 @@ export default function Home() {
 
       <GuideLink />
 
-      <Link
-        to="/documents"
-        className="cursor-pointer rounded-2xl border-2 border-sky-300 bg-white px-6 py-4 text-center text-lg font-semibold text-sky-700 hover:bg-sky-50 focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-sky-600 active:scale-[0.98]"
-      >
+      <Link to="/documents" className="guide-link">
         เอกสารการประเมิน
       </Link>
 
@@ -40,7 +37,7 @@ export default function Home() {
         to="/admin/login"
         aria-label="สำหรับ Admin"
         title="ผู้ดูแลระบบ"
-        className="mx-auto inline-flex min-h-11 items-center rounded-lg px-3 text-[10px] text-slate-500 hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-600"
+        className="mx-auto inline-flex min-h-11 items-center rounded-lg border border-slate-200 bg-slate-50 px-4 text-xs font-medium text-slate-500 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-600"
       >
         สำหรับ Admin
       </Link>
