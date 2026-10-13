@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
 import GuideLink from '../components/GuideLink'
+import VersionFooter from '../components/VersionFooter'
 
 export default function Home() {
   return (
@@ -40,6 +41,7 @@ export default function Home() {
           <path d="M8.5 16c.5-2 1.7-3 3.5-3s3 1 3.5 3" strokeLinecap="round" />
         </svg>
       </Link>
+      <VersionFooter />
     </div>
   )
 }
