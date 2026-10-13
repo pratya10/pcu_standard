@@ -77,7 +77,7 @@ export default function UserGuide() {
           <section key={lesson.id} id={lesson.id} className="guide-lesson rounded-2xl border border-slate-200 bg-white p-4 sm:p-6" aria-labelledby={`${lesson.id}-title`}>
             <h2 id={`${lesson.id}-title`} className="mb-5 text-xl font-bold text-slate-800">{lesson.title}</h2>
             <div className="grid items-start gap-6 xl:grid-cols-[1.15fr_1fr]">
-              <figure className="min-w-0">
+              <figure className={lesson.image === 'join' ? 'mx-auto w-full min-w-0 max-w-[280px]' : 'min-w-0'}>
                 <a href={`${import.meta.env.BASE_URL}guide/${lesson.image}.png`} target="_blank" rel="noopener noreferrer" className="guide-image-link block rounded-xl border border-slate-200" aria-label={`เปิดภาพขนาดเต็ม: ${lesson.title}`}>
                   <img src={`${import.meta.env.BASE_URL}guide/${lesson.image}.png`} alt={`หน้าจอ${lesson.title} พร้อมวงกลมสีแดงแสดงตำแหน่งตามขั้นตอนด้านข้าง`} className="h-auto w-full rounded-xl" width={lesson.image === 'join' ? 540 : 1100} height={lesson.image === 'join' ? 1100 : 900} loading="lazy" />
                 </a>
