@@ -30,6 +30,13 @@ export default function Home() {
       <GuideLink />
 
       <Link
+        to="/documents"
+        className="cursor-pointer rounded-2xl border-2 border-sky-300 bg-white px-6 py-4 text-center text-lg font-semibold text-sky-700 hover:bg-sky-50 focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-sky-600 active:scale-[0.98]"
+      >
+        เอกสารการประเมิน
+      </Link>
+
+      <Link
         to="/admin/login"
         aria-label="สำหรับ Admin"
         title="ผู้ดูแลระบบ"

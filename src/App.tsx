@@ -15,6 +15,7 @@ import ScoreForm from './pages/ScoreForm'
 import LiveDashboard from './pages/LiveDashboard'
 import Report from './pages/Report'
 import PublicHistory from './pages/PublicHistory'
+import Documents from './pages/Documents'
 import RequireAdmin from './components/RequireAdmin'
 import { ConfirmProvider } from './components/ConfirmProvider'
 
@@ -27,6 +28,7 @@ export default function App() {
           <Route path="/guide" element={<UserGuide />} />
           <Route path="/join" element={<Join />} />
           <Route path="/history" element={<PublicHistory />} />
+          <Route path="/documents" element={<Documents />} />
 
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route
