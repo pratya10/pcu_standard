@@ -78,7 +78,6 @@ export default function PublicHistory() {
       <header className="mb-6 text-center">
         <BrandLogo className="mx-auto mb-3 h-16 w-auto object-contain" />
         <h1 className="text-xl font-bold text-slate-800">ประวัติการประเมินที่เผยแพร่สู่สาธารณะ</h1>
-        <p className="mt-1 text-sm text-slate-500">ผลการประเมินมาตรฐานหน่วยบริการปฐมภูมิที่คณะกรรมการดำเนินการเสร็จสิ้นแล้ว</p>
       </header>
 
       <div className="mb-5 grid gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-[1fr_auto]">
