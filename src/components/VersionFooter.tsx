@@ -9,9 +9,9 @@ export default function VersionFooter() {
     <footer aria-label="เวอร์ชันและประวัติการอัปเดต" className="mt-6 flex flex-col items-center gap-3">
       <div className="text-center text-[10px] leading-relaxed text-slate-500">
         <p>Version {__APP_VERSION__} · Commit{' '}
-          <a href={`https://github.com/pratya10/pcu_standard/commit/${__GIT_HASH__}`} target="_blank" rel="noopener noreferrer" className="rounded underline underline-offset-2 hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">{__GIT_HASH__}</a>
+          <span>{__GIT_HASH__}</span>
         </p>
-        <p>อัปเดตเว็บ <time dateTime={__BUILD_DATE__}>{formatBuildDate(__BUILD_DATE__)}</time> น. (เวลาไทย)</p>
+        <p>อัปเดตเว็บ <time dateTime={__BUILD_DATE__}>{formatBuildDate(__BUILD_DATE__)}</time> น.</p>
       </div>
       <div className="h-px w-full max-w-xs bg-slate-200" />
       <div className="flex flex-wrap items-center justify-center gap-3 text-[10px] text-slate-400">
