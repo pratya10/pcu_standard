@@ -36,7 +36,7 @@ GuideLink → `.guide-link` → Tailwind emerald tokens; guide circles → `.gui
 
 ## Layout and typography
 
-Keep inherited Thai-capable body typography. Headlines use bold, captions use smaller slate text, and sequence labels use bold numbers. The public home/join forms retain their narrow layouts. The guide uses a two-column image/instructions layout on desktop and a single column on phones, with native links to full-size PNGs. Images reserve aspect ratio. The guide remains accessible without signing in and can be printed.
+Keep inherited Thai-capable body typography. Headlines use bold, captions use smaller slate text, and sequence labels use bold numbers. The public home/join forms retain their narrow layouts. The guide has sticky left chapter navigation from 1024px and a sticky horizontal chapter strip on smaller screens. Highlight the current reading section in emerald and expose it through aria-current="location"; keep the active mobile item visible without scrolling the document. Images and instructions share two columns from 1280px and stack below that, with native links to full-size PNGs. Images reserve aspect ratio. Printed guides hide navigation and return to one content column. The guide remains accessible without signing in.
 
 ## Components and behavior
 
