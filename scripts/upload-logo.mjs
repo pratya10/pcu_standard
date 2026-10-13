@@ -1,4 +1,4 @@
-// One-off helper: creates the `branding` storage bucket if needed and
+// One-off helper: creates the `pcu-standard-branding` storage bucket if needed and
 // uploads a logo file to the well-known path `logo`.
 // Usage: SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/upload-logo.mjs /path/to/logo.png
 import { createClient } from '@supabase/supabase-js'
@@ -20,20 +20,20 @@ const contentType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'sv
 
 async function main() {
   const { data: buckets } = await supabase.storage.listBuckets()
-  if (!buckets?.some((b) => b.id === 'branding')) {
-    const { error } = await supabase.storage.createBucket('branding', { public: true })
+  if (!buckets?.some((b) => b.id === 'pcu-standard-branding')) {
+    const { error } = await supabase.storage.createBucket('pcu-standard-branding', { public: true })
     if (error) throw error
-    console.log('Created bucket: branding')
+    console.log('Created bucket: pcu-standard-branding')
   }
 
   const file = readFileSync(filePath)
-  const { error } = await supabase.storage.from('branding').upload('logo', file, {
+  const { error } = await supabase.storage.from('pcu-standard-branding').upload('logo', file, {
     contentType,
     upsert: true,
   })
   if (error) throw error
 
-  const { data: pub } = supabase.storage.from('branding').getPublicUrl('logo')
+  const { data: pub } = supabase.storage.from('pcu-standard-branding').getPublicUrl('logo')
   console.log('Uploaded. Public URL:', pub.publicUrl)
 }
 

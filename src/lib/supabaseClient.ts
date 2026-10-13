@@ -10,6 +10,7 @@ if (!url || !anonKey) {
 }
 
 export const supabase = createClient(url ?? '', anonKey ?? '', {
+  db: { schema: 'pcu_standard' },
   auth: {
     persistSession: true,
     autoRefreshToken: true,

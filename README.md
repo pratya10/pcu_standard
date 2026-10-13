@@ -5,22 +5,29 @@
 - Frontend: React + Vite + TypeScript + Tailwind (SPA, มือถือก่อน) → deploy บน Cloudflare Workers ที่ path `mshprimary.com/pcustandard71`
 - Backend: Supabase (Postgres + Auth + Realtime)
 
-## 1) ตั้งค่า Supabase
+## 1) Supabase production configuration
 
-1. สร้างโปรเจกต์ใหม่ที่ [supabase.com](https://supabase.com) (แผนฟรีเพียงพอสำหรับเริ่มต้น)
-2. ไปที่ **SQL Editor** แล้วรันไฟล์ `supabase/migrations/0001_init.sql` ทั้งไฟล์ เพื่อสร้างตารางและ RLS policy
-3. คัดลอกไฟล์ `.env.example` เป็น `.env` แล้วกรอกค่า `VITE_SUPABASE_URL` และ `VITE_SUPABASE_ANON_KEY` (ดูได้จาก Project Settings → API)
-4. รัน seed script เพื่อโหลดเนื้อหามาตรฐาน (26 หัวข้อ) เข้าตาราง `categories` / `topics`:
+Production uses project `hysaddgpbriartpgselc` with schema `pcu_standard`, shared with msh-organize. All PCU database clients, seed scripts, and Realtime subscriptions target this schema. Storage uses `pcu-standard-branding` and `pcu-standard-topic-evidence`.
 
-   ```bash
-   SUPABASE_URL=https://xxxx.supabase.co \
-   SUPABASE_SERVICE_ROLE_KEY=xxxxx \
-   npm run seed
-   ```
+Do not run the historical SQL files in `supabase/migrations` against the shared project unchanged: those files target the former project's `public` schema. Scope future SQL explicitly to `pcu_standard` and the two PCU buckets.
 
-   (ใช้ **service_role key** จาก Project Settings → API — ห้ามใส่ค่านี้ใน `.env` ของฝั่ง frontend)
+Copy `.env.example` to `.env` and set:
 
-5. สร้างบัญชีผู้ดูแล (สสอ./สสจ.) ที่ Authentication → Users → Add user (กำหนดอีเมล/รหัสผ่านเอง)
+- `VITE_SUPABASE_URL=https://hysaddgpbriartpgselc.supabase.co`
+- `VITE_SUPABASE_ANON_KEY`: the project's public anon key (never a service-role key)
+- `VITE_GOOGLE_CLIENT_ID=1031385252659-rk45j7lb4db4eo52f2a4vm04m9bj0u7h.apps.googleusercontent.com`
+
+Google login uses Google Identity Services and `signInWithIdToken()`. The Supabase Google provider accepts the client ID above. Google Cloud includes the origin `https://mshprimary.com` and callback `https://hysaddgpbriartpgselc.supabase.co/auth/v1/callback`; existing origins and callbacks are retained.
+
+Migration verification on 2026-10-13:
+
+- Exposed `pcu_standard`; added schema/table/sequence privileges governed by existing RLS. All 16 tables have RLS enabled. The summary view uses `security_invoker`.
+- Copied the logo and five evidence files; downloaded target bytes match the source bytes.
+- Verified 14 non-admin tables against source data; corrected one comment's character ordering to preserve the original. Mapped round creators and both admin profiles to existing target Auth users by matching email; restored both admin allowlist entries. No shared Auth records were changed.
+- Confirmed Realtime publication contains PCU assessment rounds, participants, scores, team scores and score audit tables; client subscriptions now use the custom schema.
+- Public report for 14 September 2569 displays 39 points (75%), comments and evidence images.
+- TypeScript and production build pass. Cloudflare version: `49b52cb2-e18b-4170-aa7e-d94b8544063f`.
+- Interactive Google login still needs user confirmation; database-level authenticated-role checks pass, but do not substitute for a completed browser login.
 
 ## 2) รันในเครื่อง
 

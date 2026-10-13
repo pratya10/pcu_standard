@@ -14,7 +14,7 @@ if (!url || !key) {
   process.exit(1)
 }
 
-const supabase = createClient(url, key)
+const supabase = createClient(url, key, { db: { schema: 'pcu_standard' } })
 
 const dataPath = join(__dirname, '..', 'supabase', 'seed', 'standard-2571-2573.json')
 const data = JSON.parse(readFileSync(dataPath, 'utf-8'))

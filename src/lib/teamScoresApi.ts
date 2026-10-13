@@ -141,7 +141,7 @@ export function subscribeToTeamScores(roundId: string, onChange: (row: TeamScore
     .channel(`team-scores-${roundId}`)
     .on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'team_scores', filter: `round_id=eq.${roundId}` },
+      { event: '*', schema: 'pcu_standard', table: 'team_scores', filter: `round_id=eq.${roundId}` },
       (payload) => {
         onChange((payload.new ?? payload.old) as TeamScore, payload.eventType)
       },

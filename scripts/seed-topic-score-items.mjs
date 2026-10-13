@@ -17,7 +17,7 @@ if (!url || !key) {
   process.exit(1)
 }
 
-const supabase = createClient(url, key)
+const supabase = createClient(url, key, { db: { schema: 'pcu_standard' } })
 
 const itemsPath = join(__dirname, '..', 'supabase', 'seed', 'topic-score-items.json')
 const standardPath = join(__dirname, '..', 'supabase', 'seed', 'standard-2571-2573.json')

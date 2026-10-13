@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient'
 import type { TopicPhoto } from '../types'
 
-const BUCKET = 'topic-evidence'
+const BUCKET = 'pcu-standard-topic-evidence'
 export const MAX_PHOTO_BYTES = 30 * 1024 * 1024
 export const MAX_PHOTOS_PER_ITEM = 5
 
