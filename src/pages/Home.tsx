@@ -33,7 +33,7 @@ export default function Home() {
         to="/admin/login"
         aria-label="สำหรับ Admin"
         title="ผู้ดูแลระบบ"
-        className="mx-auto inline-flex min-h-11 items-center rounded-lg px-3 text-[10px] text-slate-500 underline underline-offset-2 hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-600"
+        className="mx-auto inline-flex min-h-11 items-center rounded-lg px-3 text-[10px] text-slate-500 hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-600"
       >
         สำหรับ Admin
       </Link>
