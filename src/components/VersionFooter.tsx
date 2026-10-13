@@ -7,7 +7,7 @@ function formatBuildDate(iso: string) {
 export default function VersionFooter() {
   return (
     <footer aria-label="เวอร์ชันและประวัติการอัปเดต" className="mt-6 flex flex-col items-center gap-3">
-      <div className="text-center text-xs leading-relaxed text-slate-500">
+      <div className="text-center text-[10px] leading-relaxed text-slate-500">
         <p>Version {__APP_VERSION__} · Commit{' '}
           <a href={`https://github.com/pratya10/pcu_standard/commit/${__GIT_HASH__}`} target="_blank" rel="noopener noreferrer" className="rounded underline underline-offset-2 hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">{__GIT_HASH__}</a>
         </p>
