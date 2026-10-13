@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
 
@@ -12,12 +12,50 @@ const lessons = [
 
 export default function UserGuide() {
   const { hash } = useLocation()
+  const [activeLesson, setActiveLesson] = useState(lessons[0].id)
+  const navRef = useRef<HTMLElement>(null)
   useEffect(() => {
     if (hash) document.getElementById(hash.slice(1))?.scrollIntoView()
   }, [hash])
 
+  useEffect(() => {
+    let frame = 0
+    const sections = lessons.map(lesson => document.getElementById(lesson.id)!)
+    const update = () => {
+      frame = 0
+      const readingLine = Math.min(window.innerHeight * .3, 180)
+      let current = lessons[0].id
+      for (const section of sections) {
+        if (section.getBoundingClientRect().top <= readingLine) current = section.id
+      }
+      setActiveLesson(current)
+    }
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(update) }
+    window.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('resize', schedule)
+    const resize = new ResizeObserver(schedule)
+    sections.forEach(section => resize.observe(section))
+    update()
+    return () => {
+      cancelAnimationFrame(frame)
+      resize.disconnect()
+      window.removeEventListener('scroll', schedule)
+      window.removeEventListener('resize', schedule)
+    }
+  }, [])
+
+  useEffect(() => {
+    const nav = navRef.current
+    const active = nav?.querySelector<HTMLElement>('[aria-current="location"]')
+    // Keep the current item visible in the compact mobile strip without moving the page.
+    if (nav && active && nav.scrollWidth > nav.clientWidth) {
+      const offset = active.getBoundingClientRect().left - nav.getBoundingClientRect().left
+      nav.scrollTo({ left: nav.scrollLeft + offset - (nav.clientWidth - active.clientWidth) / 2 })
+    }
+  }, [activeLesson])
+
   return (
-    <div id="guide-top" className="guide-page mx-auto max-w-6xl px-4 py-6 sm:px-8">
+    <div id="guide-top" className="guide-page mx-auto max-w-7xl px-4 py-6 sm:px-8">
       <header className="mb-8 border-b border-slate-200 pb-6">
         <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-3">
           <Link to="/" className="guide-link">← กลับหน้าแรก</Link>
@@ -26,18 +64,20 @@ export default function UserGuide() {
         <BrandLogo className="mb-4 h-14 w-auto object-contain" />
         <p className="mb-2 font-semibold text-emerald-700">ระบบประเมินมาตรฐาน PCU/NPCU</p>
         <h1 className="text-3xl font-bold text-slate-800">คู่มือใช้งานสำหรับเจ้าหน้าที่</h1>
-        <p className="mt-3 text-slate-600">ทำตามทีละข้อ เลขในวงกลมสีแดงตรงกับคำอธิบายใต้ภาพ</p>
-        <p className="mt-2 text-sm text-slate-500">ภาพจับจากหน้าเว็บจริงในเครื่องด้วยข้อมูลตัวอย่าง ไม่ใช่ผลประเมินจริง</p>
       </header>
-      <nav aria-label="หัวข้อคู่มือ" className="no-print mb-8 flex flex-wrap gap-2">
-        {lessons.map(lesson => <a key={lesson.id} href={`#${lesson.id}`} className="guide-link">{lesson.title}</a>)}
-      </nav>
-      <main className="space-y-10">
+      <div className="guide-layout">
+        <aside className="guide-sidebar no-print">
+          <p className="mb-2 text-sm font-semibold text-slate-600">หัวข้อคู่มือ</p>
+          <nav ref={navRef} aria-label="หัวข้อคู่มือ" className="guide-nav">
+            {lessons.map(lesson => <a key={lesson.id} href={`#${lesson.id}`} className="guide-nav-link" aria-current={activeLesson === lesson.id ? 'location' : undefined}>{lesson.title}</a>)}
+          </nav>
+        </aside>
+      <main className="min-w-0 space-y-10">
         {lessons.map(lesson => (
-          <section key={lesson.id} id={lesson.id} className="guide-lesson scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6" aria-labelledby={`${lesson.id}-title`}>
+          <section key={lesson.id} id={lesson.id} className="guide-lesson rounded-2xl border border-slate-200 bg-white p-4 sm:p-6" aria-labelledby={`${lesson.id}-title`}>
             <h2 id={`${lesson.id}-title`} className="mb-5 text-xl font-bold text-slate-800">{lesson.title}</h2>
-            <div className="grid items-start gap-6 lg:grid-cols-[1.15fr_1fr]">
-              <figure className="min-w-0">
+            <div className="grid items-start gap-6 xl:grid-cols-[1.15fr_1fr]">
+              <figure className={lesson.image === 'join' ? 'mx-auto w-full min-w-0 max-w-[280px]' : 'min-w-0'}>
                 <a href={`${import.meta.env.BASE_URL}guide/${lesson.image}.png`} target="_blank" rel="noopener noreferrer" className="guide-image-link block rounded-xl border border-slate-200" aria-label={`เปิดภาพขนาดเต็ม: ${lesson.title}`}>
                   <img src={`${import.meta.env.BASE_URL}guide/${lesson.image}.png`} alt={`หน้าจอ${lesson.title} พร้อมวงกลมสีแดงแสดงตำแหน่งตามขั้นตอนด้านข้าง`} className="h-auto w-full rounded-xl" width={lesson.image === 'join' ? 540 : 1100} height={lesson.image === 'join' ? 1100 : 900} loading="lazy" />
                 </a>
@@ -62,6 +102,7 @@ export default function UserGuide() {
           </dl>
         </section>
       </main>
+      </div>
       <footer className="mt-8 py-4 text-sm text-slate-500">คู่มือภาพหน้าจอ ณ 13 ตุลาคม 2569 <a href="#guide-top" className="no-print ml-3 underline">กลับด้านบน ↑</a></footer>
     </div>
   )

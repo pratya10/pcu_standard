@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
 import GuideLink from '../components/GuideLink'
+import VersionFooter from '../components/VersionFooter'
 
 export default function Home() {
   return (
@@ -13,27 +14,30 @@ export default function Home() {
 
       <Link
         to="/join"
-        className="rounded-2xl bg-emerald-600 px-6 py-5 text-center text-white shadow-sm active:scale-[0.98]"
+        className="home-join-button cursor-pointer rounded-2xl border border-emerald-700 bg-emerald-600 px-6 py-5 text-center text-white hover:bg-emerald-700 focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-emerald-600"
       >
         <span className="block text-xl font-bold">เข้าร่วมประเมิน</span>
         <span className="block text-sm font-medium text-emerald-50">(กรรมการ และ ผู้สังเกตการณ์)</span>
       </Link>
 
-      <GuideLink />
-
       <Link
         to="/history"
-        className="rounded-2xl border border-sky-300 bg-white px-6 py-2 text-center text-sm font-medium text-sky-700 active:scale-[0.98]"
+        className="cursor-pointer rounded-2xl border-2 border-sky-300 bg-white px-6 py-4 text-center text-lg font-semibold text-sky-700 hover:bg-sky-50 focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-sky-600 active:scale-[0.98]"
       >
         ประวัติการประเมิน
       </Link>
 
+      <GuideLink />
+
       <Link
         to="/admin/login"
-        className="rounded-2xl border border-slate-300 bg-white px-6 py-2 text-center text-sm font-medium text-slate-600 active:scale-[0.98]"
+        aria-label="สำหรับ Admin"
+        title="ผู้ดูแลระบบ"
+        className="mx-auto inline-flex min-h-11 items-center rounded-lg px-3 text-[10px] text-slate-500 hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-600"
       >
-        ผู้ดูแลระบบ
+        สำหรับ Admin
       </Link>
+      <VersionFooter />
     </div>
   )
 }

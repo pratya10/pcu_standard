@@ -64,7 +64,7 @@ export default function LiveDashboard() {
     const scoreTable = round.scoring_mode === 'collaborative' ? 'team_scores' : 'scores'
     const channel = supabase
       .channel(`round-${roundId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: scoreTable, filter: `round_id=eq.${roundId}` }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'pcu_standard', table: scoreTable, filter: `round_id=eq.${roundId}` }, (payload) => {
         setScores((prev) => {
           if (payload.eventType === 'DELETE') return prev.filter((s) => s.id !== (payload.old as Score | TeamScore).id)
           const row = round.scoring_mode === 'collaborative' ? teamScoreToScore(payload.new as TeamScore) : (payload.new as Score)
@@ -72,7 +72,7 @@ export default function LiveDashboard() {
           return [...others, row]
         })
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'participants', filter: `round_id=eq.${roundId}` }, (payload) => {
+      .on('postgres_changes', { event: '*', schema: 'pcu_standard', table: 'participants', filter: `round_id=eq.${roundId}` }, (payload) => {
         setParticipants((prev) => {
           if (payload.eventType === 'DELETE') return prev.filter((p) => p.id !== (payload.old as Participant).id)
           const row = payload.new as Participant
@@ -80,7 +80,7 @@ export default function LiveDashboard() {
           return [...others, row]
         })
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'assessment_rounds', filter: `id=eq.${roundId}` }, (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'pcu_standard', table: 'assessment_rounds', filter: `id=eq.${roundId}` }, (payload) => {
         setRound(payload.new as AssessmentRound)
       })
       .subscribe()
