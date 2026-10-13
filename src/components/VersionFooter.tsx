@@ -8,10 +8,10 @@ export default function VersionFooter() {
   return (
     <footer aria-label="เวอร์ชันและประวัติการอัปเดต" className="mt-6 flex flex-col items-center gap-3">
       <div className="text-center text-[10px] leading-relaxed text-slate-500">
+        <p>อัปเดตเว็บ <time dateTime={__BUILD_DATE__}>{formatBuildDate(__BUILD_DATE__)}</time> น.</p>
         <p>Version {__APP_VERSION__} · Commit{' '}
           <span>{__GIT_HASH__}</span>
         </p>
-        <p>อัปเดตเว็บ <time dateTime={__BUILD_DATE__}>{formatBuildDate(__BUILD_DATE__)}</time> น.</p>
       </div>
       <div className="h-px w-full max-w-xs bg-slate-200" />
       <div className="flex flex-wrap items-center justify-center gap-3 text-[10px] text-slate-400">
