@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
+import { loadGoogleIdentity } from '../lib/googleIdentity'
 import BrandLogo from '../components/BrandLogo'
 import VersionFooter from '../components/VersionFooter'
 
@@ -9,94 +10,109 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undef
 export default function AdminLogin() {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'failed' | 'signing-in'>('loading')
+  const [attempt, setAttempt] = useState(0)
   const buttonRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) {
-      setError('ยังไม่ได้ตั้งค่า VITE_GOOGLE_CLIENT_ID')
-      return
-    }
-
+    const host = buttonRef.current!
     let cancelled = false
-    let attempts = 0
+    let signingIn = false
+    let resizeObserver: ResizeObserver | undefined
 
-    function trySetup() {
-      if (cancelled) return
-      if (!window.google || !buttonRef.current) {
-        if (attempts++ < 100) setTimeout(trySetup, 100)
+    async function setup() {
+      if (!GOOGLE_CLIENT_ID) {
+        setStatus('failed')
+        setError('ยังไม่พร้อมให้เข้าสู่ระบบ กรุณาติดต่อผู้ดูแลระบบ')
         return
       }
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID!,
-        callback: handleCredentialResponse,
-      })
-      // Rendered invisible and overlaid on our own custom-styled button below
-      // — Google's terms require the real button to be the click target, but
-      // don't require it to be the visible one.
-      window.google.accounts.id.renderButton(buttonRef.current, {
-        type: 'standard',
-        theme: 'outline',
-        size: 'large',
-        width: 320,
-      })
+      try {
+        const googleId = await loadGoogleIdentity()
+        if (cancelled) return
+        googleId.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: async (response) => {
+            if (cancelled || signingIn) return
+            signingIn = true
+            setError(null)
+            setStatus('signing-in')
+            try {
+              const { error: authError } = await supabase.auth.signInWithIdToken({
+                provider: 'google',
+                token: response.credential,
+              })
+              if (authError) throw authError
+              if (!cancelled) navigate('/admin', { replace: true })
+            } catch {
+              if (!cancelled) {
+                setError('เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง')
+                setStatus('ready')
+              }
+            } finally {
+              signingIn = false
+            }
+          },
+        })
+        let renderedWidth = 0
+        const render = () => {
+          const width = Math.floor(host.clientWidth)
+          if (cancelled || width === 0 || width === renderedWidth) return
+          renderedWidth = width
+          host.replaceChildren()
+          // The visible Google control is the actual pointer and keyboard target.
+          googleId.renderButton(host, {
+            type: 'standard', theme: 'outline', size: 'large',
+            text: 'signin_with', shape: 'pill', width, locale: 'th',
+          })
+        }
+        render()
+        resizeObserver = new ResizeObserver(render)
+        resizeObserver.observe(host)
+        setStatus('ready')
+      } catch {
+        if (!cancelled) {
+          setStatus('failed')
+          setError('โหลดปุ่ม Google ไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่')
+        }
+      }
     }
-    trySetup()
+    void setup()
     return () => {
       cancelled = true
+      resizeObserver?.disconnect()
+      host.replaceChildren()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  async function handleCredentialResponse(response: { credential: string }) {
-    setError(null)
-    const { error } = await supabase.auth.signInWithIdToken({
-      provider: 'google',
-      token: response.credential,
-    })
-    if (error) {
-      setError('เข้าสู่ระบบด้วย Google ไม่สำเร็จ: ' + error.message)
-      return
-    }
-    navigate('/admin')
-  }
+  }, [attempt, navigate])
 
   return (
     <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 py-12">
       <BrandLogo className="mx-auto mb-4 h-[96px] w-auto object-contain" />
       <h1 className="mb-6 text-center text-xl font-bold text-slate-800">เข้าสู่ระบบผู้ดูแล</h1>
 
-      {error && <p className="mb-3 text-center text-sm text-red-600">{error}</p>}
-
-      <div className="relative mx-auto" style={{ width: 320, height: 44 }}>
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 rounded-full border border-slate-300 bg-white font-semibold text-slate-800 shadow-sm">
-          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
-            <path
-              fill="#FFC107"
-              d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"
-            />
-            <path
-              fill="#FF3D00"
-              d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"
-            />
-            <path
-              fill="#4CAF50"
-              d="M24 44c5.5 0 10.5-2.1 14.3-5.6l-6.6-5.6C29.6 34.7 26.9 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.6 39.6 16.3 44 24 44z"
-            />
-            <path
-              fill="#1976D2"
-              d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4.1 5.6l6.6 5.6C41.6 35.9 44 30.3 44 24c0-1.3-.1-2.7-.4-3.5z"
-            />
-          </svg>
-          เข้าสู่ระบบด้วย Google
+      <div className="mx-auto w-full max-w-[320px]">
+        <div className="grid min-h-[44px] items-center">
+          <div ref={buttonRef} inert={status !== 'ready'} className="col-start-1 row-start-1 min-w-0 w-full" />
+          {status === 'loading' && (
+            <p role="status" className="col-start-1 row-start-1 text-center text-sm text-slate-500">
+              กำลังโหลดปุ่ม Google…
+            </p>
+          )}
+          {status === 'failed' && GOOGLE_CLIENT_ID && (
+            <button type="button" onClick={() => {
+              setError(null)
+              setStatus('loading')
+              setAttempt((value) => value + 1)
+            }}
+              className="col-start-1 row-start-1 min-h-[44px] cursor-pointer rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:bg-slate-50 active:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-600">
+              ลองโหลดปุ่ม Google อีกครั้ง
+            </button>
+          )}
         </div>
-        {/* Google's rendered iframe carries its own internal negative margin
-            and ends up a few px larger than the `width`/`height` we pass, so
-            clipping it to the visible button's exact box (inset-0 +
-            overflow-hidden) left a dead strip along the edges where clicks
-            didn't register. Give it a bit of slack on every side instead. */}
-        <div ref={buttonRef} className="absolute -inset-2 opacity-0" />
+        <div className="mt-3 min-h-[3rem] text-center text-sm" aria-live="polite" aria-atomic="true">
+          {status === 'signing-in' && <p role="status" className="text-slate-600">กำลังเข้าสู่ระบบ…</p>}
+          {error && <p role="alert" className="text-red-600">{error}</p>}
+        </div>
       </div>
-
       <VersionFooter />
     </div>
   )

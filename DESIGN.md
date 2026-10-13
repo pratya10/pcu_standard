@@ -40,6 +40,8 @@ Keep inherited Thai-capable body typography. Headlines use bold, captions use sm
 
 ## Components and behavior
 
+AdminLogin uses the visible Google-rendered pill button as the sole sign-in target. Never hide the provider control behind a custom button or offset its iframe. The host follows available width up to 320px; Google owns its internal typography, focus and hit area. `src/lib/googleIdentity.ts` owns SDK loading, deduplication, timeout and retry. AdminLogin owns Thai loading/error feedback and credential-exchange pending state, while Supabase and RequireAdmin retain session and authorization ownership. Reserve space for feedback and keep the same BrandLogo and VersionFooter as public entry screens.
+
 GuideLink opens a separate tab so the assessor's entered values remain in the original page. Administrator navigation uses the existing Link list and opens the guide in the current tab, from pages without assessment entry. Native anchor links provide chapter navigation; an explicit top anchor provides return navigation. Numbered lists repeat all instructions in text, so users need not interpret color or screenshots alone. Guide controls provide hover, active and visible keyboard focus. Data in screenshots is clearly identified as illustrative.
 
 Existing native select/date controls remain platform-owned; this guide adds neither. Assessment persistence and authorization are defined by the existing application, not by the guide. Do not change those behaviors as part of documentation work.
