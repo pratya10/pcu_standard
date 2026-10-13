@@ -12,7 +12,6 @@ export default function VersionFooter() {
           <a href={`https://github.com/pratya10/pcu_standard/commit/${__GIT_HASH__}`} target="_blank" rel="noopener noreferrer" className="rounded underline underline-offset-2 hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">{__GIT_HASH__}</a>
         </p>
         <p>อัปเดตเว็บ <time dateTime={__BUILD_DATE__}>{formatBuildDate(__BUILD_DATE__)}</time> น. (เวลาไทย)</p>
-        <a href="https://github.com/pratya10/pcu_standard/commits/main/" target="_blank" rel="noopener noreferrer" className="inline-block rounded px-3 py-2 underline underline-offset-2 hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">ประวัติการอัปเดต (Commit)</a>
       </div>
       <div className="h-px w-full max-w-xs bg-slate-200" />
       <div className="flex flex-wrap items-center justify-center gap-3 text-[10px] text-slate-400">
