@@ -258,7 +258,7 @@ export default function Documents() {
                     </p>
                     {doc.description && <p className="mt-0.5 text-sm text-slate-600">{doc.description}</p>}
                     <p className="truncate text-xs text-slate-400">
-                      {doc.file_name} · {formatFileSize(doc.size_bytes)} · {formatThaiDateTime(doc.created_at)}
+                      {formatFileSize(doc.size_bytes)} · {formatThaiDateTime(doc.created_at)}
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
