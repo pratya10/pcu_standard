@@ -1,115 +1,86 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import { loadGoogleIdentity } from '../lib/googleIdentity'
 import BrandLogo from '../components/BrandLogo'
 import VersionFooter from '../components/VersionFooter'
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
-
 export default function AdminLogin() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const isCallback = params.get('callback') === 'google'
   const [error, setError] = useState<string | null>(null)
-  const [status, setStatus] = useState<'loading' | 'ready' | 'failed' | 'signing-in'>('loading')
-  const [attempt, setAttempt] = useState(0)
-  const buttonRef = useRef<HTMLDivElement>(null)
+  const [pending, setPending] = useState(isCallback)
+  const signingIn = useRef(false)
 
   useEffect(() => {
-    const host = buttonRef.current!
     let cancelled = false
-    let signingIn = false
-    let resizeObserver: ResizeObserver | undefined
-
-    async function setup() {
-      if (!GOOGLE_CLIENT_ID) {
-        setStatus('failed')
-        setError('ยังไม่พร้อมให้เข้าสู่ระบบ กรุณาติดต่อผู้ดูแลระบบ')
-        return
-      }
-      try {
-        const googleId = await loadGoogleIdentity()
+    if (isCallback) {
+      const denied = new URLSearchParams(window.location.hash.slice(1)).has('error')
+      void supabase.auth.getSession().then(({ data, error: authError }) => {
         if (cancelled) return
-        googleId.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: async (response) => {
-            if (cancelled || signingIn) return
-            signingIn = true
-            setError(null)
-            setStatus('signing-in')
-            try {
-              const { error: authError } = await supabase.auth.signInWithIdToken({
-                provider: 'google',
-                token: response.credential,
-              })
-              if (authError) throw authError
-              if (!cancelled) navigate('/admin', { replace: true })
-            } catch {
-              if (!cancelled) {
-                setError('เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง')
-                setStatus('ready')
-              }
-            } finally {
-              signingIn = false
-            }
-          },
-        })
-        let renderedWidth = 0
-        const render = () => {
-          const width = Math.floor(host.clientWidth)
-          if (cancelled || width === 0 || width === renderedWidth) return
-          renderedWidth = width
-          host.replaceChildren()
-          // The visible Google control is the actual pointer and keyboard target.
-          googleId.renderButton(host, {
-            type: 'standard', theme: 'outline', size: 'large',
-            text: 'signin_with', shape: 'pill', width, locale: 'th',
-          })
+        if (!denied && !authError && data.session) {
+          navigate('/admin', { replace: true })
+          return
         }
-        render()
-        resizeObserver = new ResizeObserver(render)
-        resizeObserver.observe(host)
-        setStatus('ready')
-      } catch {
-        if (!cancelled) {
-          setStatus('failed')
-          setError('โหลดปุ่ม Google ไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่')
-        }
+        setError('เข้าสู่ระบบไม่สำเร็จหรือถูกยกเลิก กรุณาลองอีกครั้ง')
+        setPending(false)
+        navigate('/admin/login', { replace: true })
+      }).catch(() => {
+        if (cancelled) return
+        setError('ตรวจสอบการเข้าสู่ระบบไม่สำเร็จ กรุณาลองอีกครั้ง')
+        setPending(false)
+      })
+    }
+    // Restore the button when returning from Google with the browser Back action.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted && !isCallback) {
+        signingIn.current = false
+        setPending(false)
       }
     }
-    void setup()
+    window.addEventListener('pageshow', onPageShow)
     return () => {
       cancelled = true
-      resizeObserver?.disconnect()
-      host.replaceChildren()
+      window.removeEventListener('pageshow', onPageShow)
     }
-  }, [attempt, navigate])
+  }, [isCallback, navigate])
+
+  async function signIn() {
+    if (signingIn.current || pending) return
+    signingIn.current = true
+    setError(null)
+    setPending(true)
+    try {
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: new URL(`${import.meta.env.BASE_URL}admin/login?callback=google`, window.location.origin).href,
+        },
+      })
+      if (authError) throw authError
+    } catch {
+      signingIn.current = false
+      setPending(false)
+      setError('เปิดหน้า Google ไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง')
+    }
+  }
 
   return (
     <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6 py-12">
       <BrandLogo className="mx-auto mb-4 h-[96px] w-auto object-contain" />
       <h1 className="mb-6 text-center text-xl font-bold text-slate-800">เข้าสู่ระบบผู้ดูแล</h1>
-
-      <div className="mx-auto w-full max-w-[320px]">
-        <div className="grid min-h-[44px] items-center">
-          <div ref={buttonRef} inert={status !== 'ready'} className="col-start-1 row-start-1 min-w-0 w-full" />
-          {status === 'loading' && (
-            <p role="status" className="col-start-1 row-start-1 text-center text-sm text-slate-500">
-              กำลังโหลดปุ่ม Google…
-            </p>
-          )}
-          {status === 'failed' && GOOGLE_CLIENT_ID && (
-            <button type="button" onClick={() => {
-              setError(null)
-              setStatus('loading')
-              setAttempt((value) => value + 1)
-            }}
-              className="col-start-1 row-start-1 min-h-[44px] cursor-pointer rounded-full border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:bg-slate-50 active:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-600">
-              ลองโหลดปุ่ม Google อีกครั้ง
-            </button>
-          )}
-        </div>
+      <div className="w-full">
+        <button type="button" className="pcu-google-button" onClick={() => void signIn()} disabled={pending} aria-busy={pending}>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="#4285F4" d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.4a4.6 4.6 0 0 1-2 3v2.5h3.3c1.9-1.8 2.9-4.4 2.9-7.4Z" />
+            <path fill="#34A853" d="M12 22c2.7 0 5-.9 6.7-2.4l-3.3-2.5c-.9.6-2.1 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3v2.6A10 10 0 0 0 12 22Z" />
+            <path fill="#FBBC05" d="M6.4 14a6 6 0 0 1 0-3.9V7.5H3A10 10 0 0 0 3 16.6L6.4 14Z" />
+            <path fill="#EA4335" d="M12 6c1.5 0 2.8.5 3.8 1.5l2.9-2.8A9.7 9.7 0 0 0 3 7.5l3.4 2.6C7.2 7.8 9.4 6 12 6Z" />
+          </svg>
+          <span>เข้าสู่ระบบด้วย Google</span>
+        </button>
         <div className="mt-3 min-h-[3rem] text-center text-sm" aria-live="polite" aria-atomic="true">
-          {status === 'signing-in' && <p role="status" className="text-slate-600">กำลังเข้าสู่ระบบ…</p>}
+          {pending && <p role="status" className="text-slate-600">{isCallback ? 'กำลังเข้าสู่ระบบ…' : 'กำลังเปิดหน้า Google…'}</p>}
           {error && <p role="alert" className="text-red-600">{error}</p>}
         </div>
       </div>

@@ -19,6 +19,31 @@ body {
   color: #1f2430;
 }
 
+/* Matches MSH central login; the native button owns its whole hit area. */
+.pcu-google-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 18px;
+  border: 1.5px solid #cbd8e7;
+  border-radius: 16px;
+  background: #f8fafc;
+  color: #17243a;
+  box-shadow: 0 5px 16px rgb(35 63 94 / 7%);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+.pcu-google-button svg { width: 24px; height: 24px; flex: 0 0 24px; }
+.pcu-google-button:hover:not(:disabled) { border-color: #84b5ea; background: #f1f5f9; }
+.pcu-google-button:active:not(:disabled) { background: #e8eef5; }
+.pcu-google-button:focus-visible { outline: 3px solid #2477d4; outline-offset: 3px; }
+.pcu-google-button:disabled { cursor: wait; opacity: .65; }
+
 :root {
   --guide-marker: #b91c1c;
   --scroll-thumb: #94a3b8;
