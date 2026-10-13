@@ -219,12 +219,19 @@ export default function Report() {
       const fullHeight = (canvas.height * fullWidth) / canvas.width
 
       if (mode === 'summary') {
-        // The overview report should always read as one page, so shrink it
-        // to fit the page height instead of spilling onto a second sheet.
-        const scale = Math.min(1, pageHeight / fullHeight)
-        const imgWidth = fullWidth * scale
-        const imgHeight = fullHeight * scale
-        pdf.addImage(imgData, 'JPEG', (pageWidth - imgWidth) / 2, 0, imgWidth, imgHeight)
+        // The overview report should always read as one page with a proper
+        // margin on every side, so shrink it to fit inside the printable
+        // area (page size minus margins) instead of bleeding to the edges.
+        const marginMm = 12
+        const availableWidth = pageWidth - marginMm * 2
+        const availableHeight = pageHeight - marginMm * 2
+        const naturalHeight = (canvas.height * availableWidth) / canvas.width
+        const scale = Math.min(1, availableHeight / naturalHeight)
+        const imgWidth = availableWidth * scale
+        const imgHeight = naturalHeight * scale
+        const x = (pageWidth - imgWidth) / 2
+        const y = (pageHeight - imgHeight) / 2
+        pdf.addImage(imgData, 'JPEG', x, y, imgWidth, imgHeight)
       } else {
         let heightLeft = fullHeight
         let position = 0
@@ -238,6 +245,9 @@ export default function Report() {
         }
       }
       pdf.save(`pcu-report-${round.join_code}-${mode}.pdf`)
+    } catch (err) {
+      console.error('exportPdf failed', err)
+      alert('สร้าง PDF ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง หากยังไม่สำเร็จ ลองใช้เครื่องคอมพิวเตอร์แทนมือถือ หรือดาวน์โหลดเป็น Word แทน')
     } finally {
       setExportingPdf(null)
       setPrintMode('summary')
@@ -597,6 +607,7 @@ export default function Report() {
                                                   key={p.id}
                                                   src={getTopicPhotoUrl(p.file_path)}
                                                   alt={p.file_name ?? ''}
+                                                  crossOrigin="anonymous"
                                                   className="h-20 w-20 cursor-zoom-in rounded-md border border-slate-200 object-cover"
                                                   onClick={() => setLightboxPhoto(p)}
                                                 />

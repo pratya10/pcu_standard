@@ -7,5 +7,5 @@ export default function BrandLogo({ className }: { className?: string }) {
 
   if (hidden) return null
 
-  return <img src={url} alt="โลโก้หน่วยงาน" className={className} onError={() => setHidden(true)} />
+  return <img src={url} alt="โลโก้หน่วยงาน" className={className} crossOrigin="anonymous" onError={() => setHidden(true)} />
 }
