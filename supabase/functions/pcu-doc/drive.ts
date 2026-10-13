@@ -56,14 +56,14 @@ type DriveMeta = {
   parents?: string[]
   appProperties?: Record<string, string>
 }
-type DocFile = { drive_file_id?: string | null; size: number }
+type DocFile = { drive_file_id?: string | null; size_bytes: number }
 
 export function verifyFile(meta: DriveMeta | null, docId: string, file: DocFile, folder: string): DriveMeta {
   if (
     !meta ||
     meta.trashed ||
     meta.id !== file?.drive_file_id ||
-    Number(meta.size) !== Number(file?.size) ||
+    Number(meta.size) !== Number(file?.size_bytes) ||
     !meta.owners?.some((o) => o.emailAddress?.toLowerCase() === DRIVE_ACCOUNT) ||
     !meta.parents?.includes(folder) ||
     meta.appProperties?.[MARK] !== docId
@@ -171,7 +171,7 @@ export function createDocDrive(dbPublic: Db, saveFile: SaveFile) {
   // เริ่ม หรือเริ่มต่อ: ตอบว่า Drive รับไปถึงไบต์ที่เท่าไรแล้ว หน้าเว็บส่งต่อจากตรงนั้น
   async function begin(docId: string, fileIn: any, t: string) {
     let file = fileIn
-    const done = { offset: Number(file.size), chunk_size: CHUNK_SIZE, done: true }
+    const done = { offset: Number(file.size_bytes), chunk_size: CHUNK_SIZE, done: true }
     if (file.uploaded_at) return done
     if (file.drive_file_id && (await metadata(file, t))) {
       await complete(docId, file, t)
@@ -180,13 +180,13 @@ export function createDocDrive(dbPublic: Db, saveFile: SaveFile) {
     if (file.drive_upload_url) {
       const r = await raw(validSession(file.drive_upload_url), t, {
         method: 'PUT',
-        headers: { 'content-range': `bytes */${file.size}`, 'content-length': '0' },
+        headers: { 'content-range': `bytes */${file.size_bytes}`, 'content-length': '0' },
       })
       if (r.ok) {
         await complete(docId, file, t)
         return done
       }
-      if (r.status === 308) return { offset: uploadedOffset(r, Number(file.size)), chunk_size: CHUNK_SIZE, done: false }
+      if (r.status === 308) return { offset: uploadedOffset(r, Number(file.size_bytes)), chunk_size: CHUNK_SIZE, done: false }
       if (![404, 410].includes(r.status)) err('ตรวจความคืบหน้าอัปโหลดไม่สำเร็จ')
     }
     const parent = await folder(t)
@@ -196,7 +196,7 @@ export function createDocDrive(dbPublic: Db, saveFile: SaveFile) {
       headers: {
         'content-type': 'application/json',
         'x-upload-content-type': file.mime_type || 'application/octet-stream',
-        'x-upload-content-length': String(file.size),
+        'x-upload-content-length': String(file.size_bytes),
       },
       body: JSON.stringify({ id: file.drive_file_id, name: file.file_name, parents: [parent], appProperties: { msh_module: 'pcu_standard_doc', [MARK]: docId } }),
     })
@@ -205,10 +205,10 @@ export function createDocDrive(dbPublic: Db, saveFile: SaveFile) {
     return { offset: 0, chunk_size: CHUNK_SIZE, done: false }
   }
   async function chunk(req: Request, docId: string, file: any, t: string, offset: number) {
-    if (file.uploaded_at) return { offset: Number(file.size), file }
+    if (file.uploaded_at) return { offset: Number(file.size_bytes), file }
     if (!file.drive_upload_url) err('เริ่มการอัปโหลดใหม่ก่อน', 409)
-    if (!Number.isSafeInteger(offset) || offset < 0 || offset >= Number(file.size) || offset % 262144) err('ตำแหน่งอัปโหลดไม่ถูกต้อง', 400)
-    const expected = Math.min(CHUNK_SIZE, Number(file.size) - offset)
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset >= Number(file.size_bytes) || offset % 262144) err('ตำแหน่งอัปโหลดไม่ถูกต้อง', 400)
+    const expected = Math.min(CHUNK_SIZE, Number(file.size_bytes) - offset)
     const reader = req.body?.getReader()
     if (!reader) err('ไม่พบข้อมูลไฟล์', 400)
     const parts: Uint8Array[] = []
@@ -226,12 +226,12 @@ export function createDocDrive(dbPublic: Db, saveFile: SaveFile) {
     if (length !== expected) err('ข้อมูลไฟล์มาไม่ครบ กรุณาลองใหม่', 400)
     const r = await raw(validSession(file.drive_upload_url), t, {
       method: 'PUT',
-      headers: { 'content-type': 'application/octet-stream', 'content-length': String(length), 'content-range': `bytes ${offset}-${offset + length - 1}/${file.size}` },
+      headers: { 'content-type': 'application/octet-stream', 'content-length': String(length), 'content-range': `bytes ${offset}-${offset + length - 1}/${file.size_bytes}` },
       body: new Blob(parts),
     })
-    const next = uploadedOffset(r, Number(file.size))
-    if (next < offset || next > Number(file.size)) err('ความคืบหน้าอัปโหลดไม่ถูกต้อง')
-    if (next === Number(file.size)) return { offset: next, file: await complete(docId, file, t) }
+    const next = uploadedOffset(r, Number(file.size_bytes))
+    if (next < offset || next > Number(file.size_bytes)) err('ความคืบหน้าอัปโหลดไม่ถูกต้อง')
+    if (next === Number(file.size_bytes)) return { offset: next, file: await complete(docId, file, t) }
     return { offset: next, file }
   }
   // ส่งเป็นไฟล์แนบเสมอ หน้าเว็บเปิดดู PDF/รูปเองจาก Blob (ชนิดที่ปลอดภัยเท่านั้น)
@@ -243,7 +243,7 @@ export function createDocDrive(dbPublic: Db, saveFile: SaveFile) {
     return new Response(r.body, {
       headers: {
         'content-type': file.mime_type || 'application/octet-stream',
-        'content-length': String(file.size),
+        'content-length': String(file.size_bytes),
         'content-disposition': `attachment; filename="${asciiName(file.file_name)}"; filename*=UTF-8''${encodeURIComponent(file.file_name)}`,
         'x-content-type-options': 'nosniff',
         'content-security-policy': "default-src 'none'; sandbox",
