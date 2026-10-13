@@ -1,18 +1,19 @@
 function formatBuildDate(iso: string) {
-  const d = new Date(iso)
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  const dd = String(d.getDate()).padStart(2, '0')
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mm = String(d.getMinutes()).padStart(2, '0')
-  return `${dd} ${months[d.getMonth()]} ${d.getFullYear()} ${hh}:${mm}`
+  return new Intl.DateTimeFormat('th-TH', {
+    dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Bangkok',
+  }).format(new Date(iso))
 }
 
 export default function VersionFooter() {
   return (
-    <div className="mt-6 flex flex-col items-center gap-3">
-      <p className="text-[10px] text-slate-400">
-        Version {__APP_VERSION__} | {formatBuildDate(__BUILD_DATE__)} ( {__GIT_HASH__} )
-      </p>
+    <footer aria-label="เวอร์ชันและประวัติการอัปเดต" className="mt-6 flex flex-col items-center gap-3">
+      <div className="text-center text-xs leading-relaxed text-slate-500">
+        <p>Version {__APP_VERSION__} · Commit{' '}
+          <a href={`https://github.com/pratya10/pcu_standard/commit/${__GIT_HASH__}`} target="_blank" rel="noopener noreferrer" className="rounded underline underline-offset-2 hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">{__GIT_HASH__}</a>
+        </p>
+        <p>อัปเดตเว็บ <time dateTime={__BUILD_DATE__}>{formatBuildDate(__BUILD_DATE__)}</time> น. (เวลาไทย)</p>
+        <a href="https://github.com/pratya10/pcu_standard/commits/main/" target="_blank" rel="noopener noreferrer" className="inline-block rounded px-3 py-2 underline underline-offset-2 hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">ประวัติการอัปเดต (Commit)</a>
+      </div>
       <div className="h-px w-full max-w-xs bg-slate-200" />
       <div className="flex flex-wrap items-center justify-center gap-3 text-[10px] text-slate-400">
         <span>Powered by</span>
@@ -48,6 +49,6 @@ export default function VersionFooter() {
           Supabase
         </span>
       </div>
-    </div>
+    </footer>
   )
 }
