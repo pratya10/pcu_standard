@@ -1,16 +1,19 @@
 function formatBuildDate(iso: string) {
-  return new Intl.DateTimeFormat('th-TH', {
-    dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Bangkok',
-  }).format(new Date(iso))
+  const parts = new Intl.DateTimeFormat('th-TH-u-ca-buddhist', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+    timeZone: 'Asia/Bangkok',
+  }).formatToParts(new Date(iso))
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? ''
+  return `${get('day')}/${get('month')}/${get('year')} ${get('hour')}:${get('minute')}`
 }
 
 export default function VersionFooter() {
   return (
     <footer aria-label="เวอร์ชันและประวัติการอัปเดต" className="mt-6 flex flex-col items-center gap-3">
       <div className="text-center text-[10px] leading-relaxed text-slate-500">
-        <p>อัปเดตเว็บ <time dateTime={__BUILD_DATE__}>{formatBuildDate(__BUILD_DATE__)}</time> น.</p>
-        <p>Version {__APP_VERSION__} · Commit{' '}
-          <span>{__GIT_HASH__}</span>
+        <p>
+          เว็ปไซต์เวอร์ชั่น {__APP_VERSION__} | <time dateTime={__BUILD_DATE__}>{formatBuildDate(__BUILD_DATE__)}</time> | {__GIT_HASH__}
         </p>
       </div>
       <div className="h-px w-full max-w-xs bg-slate-200" />
