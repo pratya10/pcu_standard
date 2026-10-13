@@ -1,3 +1,10 @@
+// Deployed with verify_jwt: false — the "ดาวน์โหลด" link and the home-page
+// "list" fetch are plain, unauthenticated requests (a direct browser
+// navigation for downloads can't attach an Authorization header at all),
+// and Supabase's platform-level JWT gate runs before any of this code and
+// rejects those outright if verify_jwt is left at its default (true). All
+// admin-only routes below still check the caller themselves via
+// requireAdmin() — do not re-enable verify_jwt on redeploy.
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createDocDrive, validateUpload } from './drive.ts'
 
@@ -114,6 +121,16 @@ async function routes(req: Request, path: string): Promise<Response> {
     if (item.uploaded_at) await drive.trash(item, await drive.token())
     await svcPcu(`documents?id=eq.${encodeURIComponent(single[1])}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
     return out({ ok: true, id: single[1] })
+  }
+  if (single && method === 'PATCH') {
+    await requireAdmin(req)
+    const item = await oneDoc(single[1])
+    if (!item) return out({ ok: false, error: 'ไม่พบเอกสาร หรือเอกสารถูกลบแล้ว' }, 404)
+    const body = await req.json().catch(() => ({}))
+    const title = String(body?.title || '').trim().slice(0, 300)
+    if (!title) return out({ ok: false, error: 'กรุณาระบุชื่อเอกสาร' }, 400)
+    const updated = await saveFile(single[1], { title })
+    return out({ ok: true, item: publicItem(updated) })
   }
 
   return out({ ok: false, error: 'ไม่พบรายการที่ร้องขอ' }, 404)

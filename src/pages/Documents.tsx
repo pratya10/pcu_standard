@@ -7,6 +7,7 @@ import {
   deleteDocument,
   documentDownloadUrl,
   listDocuments,
+  renameDocument,
   uploadDocument,
   type DocumentItem,
   type UploadProgress,
@@ -41,6 +42,9 @@ export default function Documents() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [jobs, setJobs] = useState<UploadJob[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [renaming, setRenaming] = useState(false)
 
   async function reload() {
     const list = await listDocuments().catch(() => [])
@@ -84,6 +88,25 @@ export default function Documents() {
         .catch((err: Error) => {
           setJobs((prev) => prev.map((j) => (j.key === job.key ? { ...j, status: 'error', error: err.message } : j)))
         })
+    }
+  }
+
+  function startEdit(doc: DocumentItem) {
+    setEditingId(doc.id)
+    setEditTitle(doc.title)
+  }
+
+  async function saveEdit() {
+    if (!editingId || !editTitle.trim()) return
+    setRenaming(true)
+    try {
+      await renameDocument(editingId, editTitle.trim())
+      setEditingId(null)
+      reload()
+    } catch (err) {
+      alert((err as Error).message)
+    } finally {
+      setRenaming(false)
     }
   }
 
@@ -149,25 +172,58 @@ export default function Documents() {
           {items.map((doc) => (
             <li key={doc.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
               <span className="text-2xl">{fileIcon(doc.mime_type)}</span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-slate-800">{doc.title}</p>
-                <p className="truncate text-xs text-slate-400">
-                  {doc.file_name} · {formatFileSize(doc.size_bytes)} · {formatThaiDateTime(doc.created_at)}
-                </p>
-              </div>
-              <a
-                href={documentDownloadUrl(doc.id)}
-                className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
-              >
-                ดาวน์โหลด
-              </a>
-              {isAdmin && (
-                <button
-                  onClick={() => handleDelete(doc)}
-                  className="shrink-0 rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
-                >
-                  ลบ
-                </button>
+              {editingId === doc.id ? (
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                  <input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                    autoFocus
+                    placeholder="ชื่อเอกสาร"
+                    className="min-w-[10rem] flex-1 rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                  />
+                  <button
+                    onClick={saveEdit}
+                    disabled={renaming || !editTitle.trim()}
+                    className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                  >
+                    บันทึก
+                  </button>
+                  <button onClick={() => setEditingId(null)} className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-500">
+                    ยกเลิก
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-slate-800">{doc.title}</p>
+                    <p className="truncate text-xs text-slate-400">
+                      {doc.file_name} · {formatFileSize(doc.size_bytes)} · {formatThaiDateTime(doc.created_at)}
+                    </p>
+                  </div>
+                  <a
+                    href={documentDownloadUrl(doc.id)}
+                    className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                  >
+                    ดาวน์โหลด
+                  </a>
+                  {isAdmin && (
+                    <>
+                      <button
+                        onClick={() => startEdit(doc)}
+                        className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                      >
+                        แก้ไขชื่อ
+                      </button>
+                      <button
+                        onClick={() => handleDelete(doc)}
+                        className="shrink-0 rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
+                      >
+                        ลบ
+                      </button>
+                    </>
+                  )}
+                </>
               )}
             </li>
           ))}

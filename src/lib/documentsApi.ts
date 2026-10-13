@@ -42,6 +42,15 @@ export async function deleteDocument(id: string): Promise<void> {
   await call(`documents/${id}`, { method: 'DELETE' })
 }
 
+export async function renameDocument(id: string, title: string): Promise<DocumentItem> {
+  const body = await call<{ item: DocumentItem }>(`documents/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  })
+  return body.item
+}
+
 export type UploadProgress = { loaded: number; total: number }
 
 // อัปโหลดทีละ 4 MB ไปที่ Edge Function (pcu-doc) ซึ่งส่งต่อเข้า resumable session ของ
