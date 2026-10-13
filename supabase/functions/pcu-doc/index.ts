@@ -15,7 +15,7 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
+  'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
 }
 const out = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
@@ -43,22 +43,37 @@ async function svc(schema: 'public' | 'pcu_standard', path: string, opt: Request
 const svcPublic = (path: string, opt?: RequestInit) => svc('public', path, opt)
 const svcPcu = (path: string, opt?: RequestInit) => svc('pcu_standard', path, opt)
 
-async function requireAdmin(req: Request): Promise<{ userId: string; email: string }> {
+async function adminIdentity(req: Request): Promise<{ userId: string; email: string } | null> {
   const auth = req.headers.get('Authorization') || ''
-  if (!auth.startsWith('Bearer ')) throw Object.assign(new Error('กรุณาเข้าสู่ระบบ'), { status: 401 })
+  if (!auth.startsWith('Bearer ')) return null
   const ur = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: ANON_KEY, Authorization: auth } })
-  if (!ur.ok) throw Object.assign(new Error('กรุณาเข้าสู่ระบบ'), { status: 401 })
+  if (!ur.ok) return null
   const au = await ur.json()
   const email = String(au?.email || '').toLowerCase()
-  if (!email) throw Object.assign(new Error('กรุณาเข้าสู่ระบบ'), { status: 401 })
+  if (!email) return null
   const rows = await svcPcu(`admin_allowlist?select=email&email=ilike.${encodeURIComponent(email)}&limit=1`)
-  if (!Array.isArray(rows) || rows.length === 0) throw Object.assign(new Error('เฉพาะผู้ดูแลระบบเท่านั้นที่อัปโหลด/ลบเอกสารได้'), { status: 403 })
+  if (!Array.isArray(rows) || rows.length === 0) return null
   return { userId: String(au.id), email }
 }
+async function requireAdmin(req: Request): Promise<{ userId: string; email: string }> {
+  const identity = await adminIdentity(req)
+  if (!identity) throw Object.assign(new Error('เฉพาะผู้ดูแลระบบเท่านั้นที่ทำรายการนี้ได้'), { status: 403 })
+  return identity
+}
 
-const DOC_PUBLIC_FIELDS = 'id,title,file_name,mime_type,size_bytes,created_at'
+const DOC_PUBLIC_FIELDS = 'id,title,description,file_name,mime_type,size_bytes,hidden,sort_order,created_at'
 function publicItem(row: any) {
-  return { id: row.id, title: row.title, file_name: row.file_name, mime_type: row.mime_type, size_bytes: Number(row.size_bytes), created_at: row.created_at }
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description ?? null,
+    file_name: row.file_name,
+    mime_type: row.mime_type,
+    size_bytes: Number(row.size_bytes),
+    hidden: Boolean(row.hidden),
+    sort_order: Number(row.sort_order ?? 0),
+    created_at: row.created_at,
+  }
 }
 async function saveFile(docId: string, patch: Record<string, unknown>) {
   const rows = await svcPcu(`documents?id=eq.${encodeURIComponent(docId)}`, {
@@ -78,9 +93,11 @@ async function routes(req: Request, path: string): Promise<Response> {
   const method = req.method.toUpperCase()
 
   if (path === 'list' && method === 'GET') {
-    const rows = await svcPcu(`documents?uploaded_at=not.is.null&select=${DOC_PUBLIC_FIELDS}&order=created_at.desc&limit=500`)
+    const admin = await adminIdentity(req)
+    const visibility = admin ? '' : '&hidden=eq.false'
+    const rows = await svcPcu(`documents?uploaded_at=not.is.null${visibility}&select=${DOC_PUBLIC_FIELDS}&order=sort_order.asc,created_at.asc&limit=500`)
     const items = (rows as any[]).map(publicItem)
-    return out({ ok: true, items })
+    return out({ ok: true, items, is_admin: Boolean(admin) })
   }
 
   if (path === 'documents' && method === 'POST') {
@@ -89,13 +106,25 @@ async function routes(req: Request, path: string): Promise<Response> {
     const file = validateUpload(body)
     await drive.token() // Drive ระบบกลางต้องพร้อมก่อน ไม่งั้นได้เอกสารเปล่าค้างในรายการ
     const title = String(body?.title || '').trim().slice(0, 300) || file.name
+    const description = String(body?.description || '').trim().slice(0, 2000) || null
+    const maxRows = await svcPcu('documents?select=sort_order&order=sort_order.desc&limit=1')
+    const nextSortOrder = Number((maxRows as any[])?.[0]?.sort_order ?? 0) + 1
     const rows = await svcPcu('documents', {
       method: 'POST',
-      body: JSON.stringify({ title, file_name: file.name, mime_type: file.mime, size_bytes: file.size, created_by: admin.userId }),
+      body: JSON.stringify({ title, description, file_name: file.name, mime_type: file.mime, size_bytes: file.size, created_by: admin.userId, sort_order: nextSortOrder }),
       headers: { Prefer: 'return=representation' },
     })
     const item = (rows as any[])?.[0]
     return out({ ok: true, item: { id: item.id } }, 201)
+  }
+
+  if (path === 'reorder' && method === 'POST') {
+    await requireAdmin(req)
+    const body = await req.json().catch(() => ({}))
+    const ids: string[] = Array.isArray(body?.ids) ? body.ids.filter((x: unknown) => typeof x === 'string') : []
+    if (ids.length === 0) return out({ ok: false, error: 'ไม่มีรายการให้จัดเรียง' }, 400)
+    await Promise.all(ids.map((id, index) => saveFile(id, { sort_order: index + 1 })))
+    return out({ ok: true })
   }
 
   const fileRoute = path.match(/^documents\/([0-9a-f-]{36})\/(upload|upload\/content|download)$/i)
@@ -127,9 +156,16 @@ async function routes(req: Request, path: string): Promise<Response> {
     const item = await oneDoc(single[1])
     if (!item) return out({ ok: false, error: 'ไม่พบเอกสาร หรือเอกสารถูกลบแล้ว' }, 404)
     const body = await req.json().catch(() => ({}))
-    const title = String(body?.title || '').trim().slice(0, 300)
-    if (!title) return out({ ok: false, error: 'กรุณาระบุชื่อเอกสาร' }, 400)
-    const updated = await saveFile(single[1], { title })
+    const patch: Record<string, unknown> = {}
+    if (body?.title !== undefined) {
+      const title = String(body.title || '').trim().slice(0, 300)
+      if (!title) return out({ ok: false, error: 'กรุณาระบุชื่อเอกสาร' }, 400)
+      patch.title = title
+    }
+    if (body?.description !== undefined) patch.description = String(body.description || '').trim().slice(0, 2000) || null
+    if (body?.hidden !== undefined) patch.hidden = Boolean(body.hidden)
+    if (Object.keys(patch).length === 0) return out({ ok: false, error: 'ไม่มีข้อมูลให้แก้ไข' }, 400)
+    const updated = await saveFile(single[1], patch)
     return out({ ok: true, item: publicItem(updated) })
   }
 

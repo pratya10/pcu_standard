@@ -3,9 +3,12 @@ import { supabase } from './supabaseClient'
 export type DocumentItem = {
   id: string
   title: string
+  description: string | null
   file_name: string
   mime_type: string
   size_bytes: number
+  hidden: boolean
+  sort_order: number
   created_at: string
 }
 
@@ -29,9 +32,9 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T
 }
 
-export async function listDocuments(): Promise<DocumentItem[]> {
-  const body = await call<{ items: DocumentItem[] }>('list')
-  return body.items
+export async function listDocuments(): Promise<{ items: DocumentItem[]; isAdmin: boolean }> {
+  const body = await call<{ items: DocumentItem[]; is_admin: boolean }>('list')
+  return { items: body.items, isAdmin: Boolean(body.is_admin) }
 }
 
 export function documentDownloadUrl(id: string): string {
@@ -42,13 +45,22 @@ export async function deleteDocument(id: string): Promise<void> {
   await call(`documents/${id}`, { method: 'DELETE' })
 }
 
-export async function renameDocument(id: string, title: string): Promise<DocumentItem> {
+export async function updateDocument(id: string, patch: { title?: string; description?: string; hidden?: boolean }): Promise<DocumentItem> {
   const body = await call<{ item: DocumentItem }>(`documents/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title }),
+    body: JSON.stringify(patch),
   })
   return body.item
+}
+
+// ids เรียงตามลำดับที่ต้องการแสดง (ลากแล้วปล่อย) — ฟังก์ชันตั้ง sort_order ตามตำแหน่งในลิสต์นี้
+export async function reorderDocuments(ids: string[]): Promise<void> {
+  await call('reorder', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  })
 }
 
 export type UploadProgress = { loaded: number; total: number }
@@ -79,12 +91,17 @@ function putChunk(id: string, offset: number, blob: Blob, token: string, onProgr
   })
 }
 
-export async function uploadDocument(file: File, title: string, onProgress?: (p: UploadProgress) => void): Promise<DocumentItem> {
+export async function uploadDocument(
+  file: File,
+  title: string,
+  description: string,
+  onProgress?: (p: UploadProgress) => void,
+): Promise<DocumentItem> {
   const token = await authHeader()
   const created = await call<{ item: { id: string } }>('documents', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title, name: file.name, size: file.size, mime: file.type || 'application/octet-stream' }),
+    body: JSON.stringify({ title, description, name: file.name, size: file.size, mime: file.type || 'application/octet-stream' }),
   })
   const id = created.item.id
 
@@ -98,7 +115,7 @@ export async function uploadDocument(file: File, title: string, onProgress?: (p:
     if (result.done) break
   }
   onProgress?.({ loaded: file.size, total: file.size })
-  const items = await listDocuments()
+  const { items } = await listDocuments()
   const item = items.find((d) => d.id === id)
   if (!item) throw new Error('อัปโหลดเสร็จแล้วแต่หารายการไม่พบ กรุณารีเฟรชหน้า')
   return item

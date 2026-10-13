@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useConfirm } from '../components/ConfirmProvider'
+import FileTypeIcon from '../components/FileTypeIcon'
 import { formatThaiDateTime } from '../lib/thaiDate'
 import {
   deleteDocument,
   documentDownloadUrl,
   listDocuments,
-  renameDocument,
+  reorderDocuments,
+  updateDocument,
   uploadDocument,
   type DocumentItem,
   type UploadProgress,
@@ -25,15 +27,6 @@ function formatFileSize(bytes: number): string {
   return `${value.toFixed(value < 10 ? 1 : 0)} ${units[i]}`
 }
 
-function fileIcon(mime: string): string {
-  if (mime.includes('pdf')) return '📕'
-  if (mime.includes('image')) return '🖼️'
-  if (mime.includes('word') || mime.includes('document')) return '📘'
-  if (mime.includes('sheet') || mime.includes('excel')) return '📗'
-  if (mime.includes('presentation') || mime.includes('powerpoint')) return '📙'
-  return '📄'
-}
-
 type UploadJob = { key: string; file: File; title: string; progress: UploadProgress; status: 'uploading' | 'done' | 'error'; error?: string }
 
 export default function Documents() {
@@ -44,22 +37,20 @@ export default function Documents() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
-  const [renaming, setRenaming] = useState(false)
+  const [editDescription, setEditDescription] = useState('')
+  const [saving, setSaving] = useState(false)
+  const dragIndex = useRef<number | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
 
   async function reload() {
-    const list = await listDocuments().catch(() => [])
-    setItems(list)
+    const { items, isAdmin } = await listDocuments().catch(() => ({ items: [], isAdmin: false }))
+    setItems(items)
+    setIsAdmin(isAdmin)
   }
 
   useEffect(() => {
     reload()
-    async function checkAdmin(session: unknown) {
-      if (!session) return setIsAdmin(false)
-      const { data } = await supabase.rpc('is_admin')
-      setIsAdmin(Boolean(data))
-    }
-    supabase.auth.getSession().then(({ data }) => checkAdmin(data.session))
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => checkAdmin(session))
+    const { data: sub } = supabase.auth.onAuthStateChange(() => reload())
     return () => sub.subscription.unsubscribe()
   }, [])
 
@@ -78,7 +69,7 @@ export default function Documents() {
     }))
     setJobs((prev) => [...prev, ...newJobs])
     for (const job of newJobs) {
-      uploadDocument(job.file, job.title, (progress) => {
+      uploadDocument(job.file, job.title, '', (progress) => {
         setJobs((prev) => prev.map((j) => (j.key === job.key ? { ...j, progress } : j)))
       })
         .then(() => {
@@ -94,19 +85,29 @@ export default function Documents() {
   function startEdit(doc: DocumentItem) {
     setEditingId(doc.id)
     setEditTitle(doc.title)
+    setEditDescription(doc.description ?? '')
   }
 
   async function saveEdit() {
     if (!editingId || !editTitle.trim()) return
-    setRenaming(true)
+    setSaving(true)
     try {
-      await renameDocument(editingId, editTitle.trim())
+      await updateDocument(editingId, { title: editTitle.trim(), description: editDescription.trim() })
       setEditingId(null)
       reload()
     } catch (err) {
       alert((err as Error).message)
     } finally {
-      setRenaming(false)
+      setSaving(false)
+    }
+  }
+
+  async function toggleHidden(doc: DocumentItem) {
+    try {
+      await updateDocument(doc.id, { hidden: !doc.hidden })
+      reload()
+    } catch (err) {
+      alert((err as Error).message)
     }
   }
 
@@ -115,6 +116,33 @@ export default function Documents() {
     if (!ok) return
     await deleteDocument(doc.id)
     reload()
+  }
+
+  // ลากสลับตำแหน่งแบบ optimistic ใน state ก่อน แล้วค่อยบันทึก sort_order จริงตอนปล่อยเมาส์
+  function handleDragStart(index: number) {
+    dragIndex.current = index
+  }
+  function handleDragOver(e: React.DragEvent, overId: string, overIndex: number) {
+    e.preventDefault()
+    setDragOverId(overId)
+    const from = dragIndex.current
+    if (from === null || from === overIndex || !items) return
+    const next = [...items]
+    const [moved] = next.splice(from, 1)
+    next.splice(overIndex, 0, moved)
+    dragIndex.current = overIndex
+    setItems(next)
+  }
+  async function handleDrop() {
+    setDragOverId(null)
+    dragIndex.current = null
+    if (!items) return
+    try {
+      await reorderDocuments(items.map((d) => d.id))
+    } catch (err) {
+      alert((err as Error).message)
+      reload()
+    }
   }
 
   return (
@@ -135,7 +163,9 @@ export default function Documents() {
           >
             + อัปโหลดเอกสารใหม่
           </button>
-          <p className="mt-2 text-xs text-slate-500">ไฟล์จะถูกเก็บใน Google Drive ของหน่วยงาน · ไฟล์ละไม่เกิน 60 MB · ห้ามอัปโหลดข้อมูลผู้ป่วย</p>
+          <p className="mt-2 text-xs text-slate-500">
+            ไฟล์จะถูกเก็บใน Google Drive ของหน่วยงาน · ไฟล์ละไม่เกิน 60 MB · ห้ามอัปโหลดข้อมูลผู้ป่วย · ลากไอคอน ⠿ เพื่อจัดลำดับ
+          </p>
 
           {jobs.length > 0 && (
             <div className="mt-3 space-y-2">
@@ -169,60 +199,89 @@ export default function Documents() {
         <p className="py-10 text-center text-sm text-slate-400">ยังไม่มีเอกสาร</p>
       ) : (
         <ul className="space-y-2">
-          {items.map((doc) => (
-            <li key={doc.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
-              <span className="text-2xl">{fileIcon(doc.mime_type)}</span>
+          {items.map((doc, index) => (
+            <li
+              key={doc.id}
+              draggable={isAdmin && editingId !== doc.id}
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={(e) => handleDragOver(e, doc.id, index)}
+              onDrop={handleDrop}
+              onDragEnd={() => {
+                setDragOverId(null)
+                dragIndex.current = null
+              }}
+              className={`flex items-start gap-3 rounded-xl border bg-white p-3 ${
+                dragOverId === doc.id ? 'border-emerald-400 ring-2 ring-emerald-200' : 'border-slate-200'
+              } ${doc.hidden ? 'opacity-50' : ''}`}
+            >
+              {isAdmin && editingId !== doc.id && (
+                <span className="mt-2 shrink-0 cursor-grab select-none text-slate-300" title="ลากเพื่อจัดลำดับ">
+                  ⠿
+                </span>
+              )}
+              <FileTypeIcon mime={doc.mime_type} className="h-9 w-9 shrink-0" />
               {editingId === doc.id ? (
-                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <input
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
                     autoFocus
                     placeholder="ชื่อเอกสาร"
-                    className="min-w-[10rem] flex-1 rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                    className="rounded-lg border border-slate-300 px-2 py-1 text-sm"
                   />
-                  <button
-                    onClick={saveEdit}
-                    disabled={renaming || !editTitle.trim()}
-                    className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-                  >
-                    บันทึก
-                  </button>
-                  <button onClick={() => setEditingId(null)} className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-500">
-                    ยกเลิก
-                  </button>
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    placeholder="คำอธิบายเอกสาร (ไม่บังคับ)"
+                    rows={2}
+                    className="rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={saveEdit}
+                      disabled={saving || !editTitle.trim()}
+                      className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+                    >
+                      บันทึก
+                    </button>
+                    <button onClick={() => setEditingId(null)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-500">
+                      ยกเลิก
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-slate-800">{doc.title}</p>
+                    <p className="truncate font-medium text-slate-800">
+                      {doc.title}
+                      {doc.hidden && <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-normal text-slate-500">ซ่อนอยู่</span>}
+                    </p>
+                    {doc.description && <p className="mt-0.5 text-sm text-slate-600">{doc.description}</p>}
                     <p className="truncate text-xs text-slate-400">
                       {doc.file_name} · {formatFileSize(doc.size_bytes)} · {formatThaiDateTime(doc.created_at)}
                     </p>
                   </div>
-                  <a
-                    href={documentDownloadUrl(doc.id)}
-                    className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
-                  >
-                    ดาวน์โหลด
-                  </a>
-                  {isAdmin && (
-                    <>
-                      <button
-                        onClick={() => startEdit(doc)}
-                        className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
-                      >
-                        แก้ไขชื่อ
-                      </button>
-                      <button
-                        onClick={() => handleDelete(doc)}
-                        className="shrink-0 rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
-                      >
-                        ลบ
-                      </button>
-                    </>
-                  )}
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                    <a
+                      href={documentDownloadUrl(doc.id)}
+                      className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                    >
+                      ดาวน์โหลด
+                    </a>
+                    {isAdmin && (
+                      <>
+                        <button onClick={() => startEdit(doc)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                          แก้ไข
+                        </button>
+                        <button onClick={() => toggleHidden(doc)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                          {doc.hidden ? 'แสดง' : 'ซ่อน'}
+                        </button>
+                        <button onClick={() => handleDelete(doc)} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50">
+                          ลบ
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </>
               )}
             </li>
