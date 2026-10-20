@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import type { AssessmentRound, Facility } from '../types'
 import BrandLogo from '../components/BrandLogo'
+import Icon from '../components/Icon'
 import { formatThaiDate } from '../lib/thaiDate'
 
 type RoundRow = AssessmentRound & { facility: Facility | null }
@@ -23,6 +24,9 @@ export default function PublicHistory() {
   const [retry, setRetry] = useState(0)
   const [composing, setComposing] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
+  // ส่วนค้นหาซ่อนไว้ก่อน · เปิดเองเมื่อมาจากลิงก์ที่มีตัวกรองอยู่แล้ว จะได้เห็นว่ากรองอะไรอยู่
+  const [filtersOpen, setFiltersOpen] = useState(() => Boolean(query || date))
+  const activeFilters = (query ? 1 : 0) + (date ? 1 : 0)
 
   function update(key: string, value: string) {
     setLoading(true)
@@ -80,7 +84,15 @@ export default function PublicHistory() {
         <h1 className="text-xl font-bold text-slate-800">ประวัติการประเมินที่เผยแพร่สู่สาธารณะ</h1>
       </header>
 
-      <div className="mb-5 grid gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-[1fr_auto]">
+      <div className="mb-3 flex justify-end">
+        <button type="button" aria-expanded={filtersOpen} aria-controls="history-filters" onClick={() => setFiltersOpen(open => !open)} className={`${action} inline-flex items-center gap-1.5`}>
+          <Icon name={filtersOpen ? 'filter_list_off' : 'filter_list'} className="text-xl" />
+          {filtersOpen ? 'ซ่อนการค้นหา' : 'ค้นหาชื่อ / วันที่'}
+          {!filtersOpen && activeFilters > 0 && <span className="rounded-full bg-sky-700 px-2 text-xs text-white" aria-label={`กรองอยู่ ${activeFilters} อย่าง`}>{activeFilters}</span>}
+        </button>
+      </div>
+
+      <div id="history-filters" hidden={!filtersOpen} className="mb-5 grid gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:grid-cols-[1fr_auto]">
         <div>
           <label htmlFor="history-name" className="mb-1 block text-sm font-semibold text-slate-700">ค้นหาชื่อ รพ.สต. / หน่วยบริการ</label>
           <div className="relative">
