@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Navigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
+import { centralLogout } from '../lib/mshSession'
 
 export default function RequireAdmin({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<'loading' | 'authed' | 'anon' | 'unauthorized'>('loading')
@@ -16,7 +17,7 @@ export default function RequireAdmin({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.rpc('is_admin')
       if (cancelled) return
       if (error || !data) {
-        await supabase.auth.signOut()
+        // ไม่ signOut: session นี้เป็นของระบบกลาง ใช้กับ organize ต่อได้ แค่ไม่มีสิทธิ์ผู้ดูแลที่นี่
         if (!cancelled) setStatus('unauthorized')
         return
       }
@@ -39,9 +40,9 @@ export default function RequireAdmin({ children }: { children: ReactNode }) {
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="font-semibold text-red-600">บัญชีนี้ไม่มีสิทธิ์เข้าถึงระบบผู้ดูแล</p>
         <p className="text-sm text-slate-500">กรุณาติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์เข้าถึง</p>
-        <a href="/pcustandard71/admin/login" className="mt-2 text-sm text-emerald-700 underline">
-          กลับไปหน้าเข้าสู่ระบบ
-        </a>
+        <button type="button" onClick={() => centralLogout()} className="mt-2 text-sm text-emerald-700 underline">
+          เข้าสู่ระบบด้วยบัญชีอื่น
+        </button>
       </div>
     )
   }

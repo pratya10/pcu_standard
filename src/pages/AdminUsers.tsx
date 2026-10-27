@@ -71,8 +71,8 @@ export default function AdminUsers() {
     }
     await removeAdminUser(entry.email)
     if (entry.email === myEmail) {
-      await supabase.auth.signOut()
-      window.location.href = '/pcustandard71/admin/login'
+      // ลบสิทธิ์ตัวเอง: ไม่ต้องออกจากระบบกลาง แค่กลับหน้าแรก (หน้าผู้ดูแลจะขึ้นว่าไม่มีสิทธิ์)
+      window.location.href = '/pcustandard71/'
       return
     }
     load()

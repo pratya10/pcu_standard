@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { formatAdminName, getMyAdminProfile } from '../lib/adminProfile'
+import { centralLogout } from '../lib/mshSession'
 import BrandLogo from './BrandLogo'
 
 function formatBuildDate(iso: string) {
@@ -33,7 +34,6 @@ export default function AdminLayout({
   children: ReactNode
   maxWidth?: string
 }) {
-  const navigate = useNavigate()
   const location = useLocation()
   const [displayName, setDisplayName] = useState('ผู้ดูแล')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -50,9 +50,8 @@ export default function AdminLayout({
     setMenuOpen(false)
   }, [location.pathname])
 
-  async function logout() {
-    await supabase.auth.signOut()
-    navigate('/admin/login')
+  function logout() {
+    centralLogout()
   }
 
   function isActive(to: string) {
