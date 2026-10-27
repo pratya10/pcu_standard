@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { mshAuthStorage, PCU_AUTH_STORAGE_KEY } from './mshSession'
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -14,7 +15,9 @@ export const supabase = createClient(url ?? '', anonKey ?? '', {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
-    storage: window.localStorage,
+    // session มาจากระบบกลาง (Central Login) ไม่รับจาก URL · ดู mshSession.ts
+    detectSessionInUrl: false,
+    storageKey: PCU_AUTH_STORAGE_KEY,
+    storage: mshAuthStorage,
   },
 })
