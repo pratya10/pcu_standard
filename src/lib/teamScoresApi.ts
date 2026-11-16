@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient'
+import { getParticipantCredentials, rpcErrorMessage, unwrapRpc } from './participantSession'
 import type { ItemNote, Score, ScoreValue, TeamComment, TeamItemNote, TeamScore, TeamScoreAudit, TeamScoreAuditField } from '../types'
 
 // Team comments are stored as JSON.stringify(TeamComment[]) in what's
@@ -89,30 +90,32 @@ export type TeamScoreDraft = {
 // that field's "who set this" column gets stamped — a comment-only or
 // item-only save shouldn't silently reassign the CI score's or Must
 // result's attribution to whoever happened to save last.
+// กรรมการบันทึกคะแนนทีมผ่าน RPC pcu_standard.save_team_score · attribution.ci = ผู้เรียกเป็นผู้ให้คะแนน CI ล่าสุด
+// attribution.must = ผู้เรียกเป็นผู้ตัดสิน Must (ฐานข้อมูลบันทึกเวลาให้เอง)
 export async function upsertTeamScore(
   draft: TeamScoreDraft,
   participantId: string,
   attribution: { ci?: boolean; must?: boolean } = {},
 ): Promise<TeamScore> {
-  const payload: Record<string, unknown> = {
-    round_id: draft.roundId,
-    topic_id: draft.topicId,
+  const creds = getParticipantCredentials(draft.roundId)
+  if (!creds || creds.participantId !== participantId) throw new Error(rpcErrorMessage('FORBIDDEN'))
+  const fields: Record<string, unknown> = {
     score: draft.isNa ? 0 : draft.score,
     is_na: draft.isNa,
-    must_pass: draft.mustPass,
     comment: draft.comment || null,
     item_notes: draft.itemNotes,
-    updated_at: new Date().toISOString(),
+    attribute_ci: !!attribution.ci,
   }
-  if (attribution.ci) payload.updated_by = participantId
-  if (attribution.must) {
-    payload.must_pass_updated_by = participantId
-    payload.must_pass_updated_at = payload.updated_at
-  }
-
-  const { data, error } = await supabase.from('team_scores').upsert(payload, { onConflict: 'round_id,topic_id' }).select().single()
-  if (error) throw error
-  return data as TeamScore
+  // must_pass ส่งเฉพาะเมื่อผู้เรียกเป็นผู้ตัดสิน Must เพื่อไม่ให้ชื่อผู้ตัดสินเดิมถูกแทนที่
+  if (attribution.must) fields.must_pass = draft.mustPass
+  const { data, error } = await supabase.rpc('save_team_score', {
+    p_join_code: creds.joinCode,
+    p_participant_id: creds.participantId,
+    p_device_key: creds.deviceKey,
+    p_topic_id: draft.topicId,
+    p_fields: fields,
+  })
+  return unwrapRpc<{ ok: boolean; team_score: TeamScore }>(data, error).team_score
 }
 
 export async function logTeamScoreOverwrite(params: {
@@ -124,16 +127,19 @@ export async function logTeamScoreOverwrite(params: {
   oldValue: unknown
   newValue: unknown
 }) {
-  const { error } = await supabase.from('team_score_audit').insert({
-    round_id: params.roundId,
-    topic_id: params.topicId,
-    item_id: params.itemId ?? null,
-    field: params.field,
-    participant_id: params.participantId,
-    old_value: params.oldValue,
-    new_value: params.newValue,
+  const creds = getParticipantCredentials(params.roundId)
+  if (!creds || creds.participantId !== params.participantId) throw new Error(rpcErrorMessage('FORBIDDEN'))
+  const { data, error } = await supabase.rpc('log_team_score_audit', {
+    p_join_code: creds.joinCode,
+    p_participant_id: creds.participantId,
+    p_device_key: creds.deviceKey,
+    p_topic_id: params.topicId,
+    p_field: params.field,
+    p_old_value: params.oldValue ?? null,
+    p_new_value: params.newValue ?? null,
+    p_item_id: params.itemId ?? null,
   })
-  if (error) throw error
+  unwrapRpc(data, error)
 }
 
 export function subscribeToTeamScores(roundId: string, onChange: (row: TeamScore, eventType: string) => void) {

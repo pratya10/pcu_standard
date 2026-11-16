@@ -1,3 +1,4 @@
+import { ROUND_COLUMNS } from '../lib/pcuColumns'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
@@ -49,7 +50,7 @@ export default function PublicHistory() {
       try {
         const name = query.trim()
         let request = supabase.from('assessment_rounds')
-          .select(name ? '*, facility:facilities!inner(*)' : '*, facility:facilities(*)', { count: 'exact' })
+          .select(name ? `${ROUND_COLUMNS}, facility:facilities!inner(*)` : `${ROUND_COLUMNS}, facility:facilities(*)`, { count: 'exact' })
           .eq('status', 'completed').eq('is_public', true)
         if (name) request = request.ilike('facility.name', `%${name.replace(/[\\%_]/g, '\\$&')}%`)
         if (date) request = request.eq('survey_date', date)

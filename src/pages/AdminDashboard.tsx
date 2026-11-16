@@ -1,3 +1,4 @@
+import { ROUND_COLUMNS, withJoinCodes } from '../lib/pcuColumns'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
@@ -39,17 +40,18 @@ export default function AdminDashboard() {
       setLoading(true)
       const { data: roundsData, error } = await supabase
         .from('assessment_rounds')
-        .select('*')
+        .select(ROUND_COLUMNS)
         .order('created_at', { ascending: false })
       if (error) {
         console.error(error)
         setLoading(false)
         return
       }
-      const facilityIds = [...new Set((roundsData as AssessmentRound[]).map((r) => r.facility_id))]
+      const roundsWithCodes = await withJoinCodes(roundsData as unknown as AssessmentRound[])
+      const facilityIds = [...new Set(roundsWithCodes.map((r) => r.facility_id))]
       const { data: facilitiesData } = await supabase.from('facilities').select('*').in('id', facilityIds.length ? facilityIds : [''])
       const facMap = new Map((facilitiesData as Facility[] | null)?.map((f) => [f.id, f]) ?? [])
-      setRounds((roundsData as AssessmentRound[]).map((r) => ({ ...r, facility: facMap.get(r.facility_id) })))
+      setRounds(roundsWithCodes.map((r) => ({ ...r, facility: facMap.get(r.facility_id) })))
       setLoading(false)
     }
     load()
@@ -63,7 +65,7 @@ export default function AdminDashboard() {
       if (!q) return true
       return (
         r.name.toLowerCase().includes(q) ||
-        r.join_code.toLowerCase().includes(q) ||
+        (r.join_code ?? '').toLowerCase().includes(q) ||
         (r.facility?.name ?? '').toLowerCase().includes(q) ||
         (r.facility?.code ?? '').toLowerCase().includes(q) ||
         (r.facility?.pcu_code ?? '').toLowerCase().includes(q) ||

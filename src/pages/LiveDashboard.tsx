@@ -1,3 +1,4 @@
+import { ROUND_COLUMNS, PARTICIPANT_COLUMNS } from '../lib/pcuColumns'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
@@ -32,7 +33,7 @@ export default function LiveDashboard() {
     setFacility(null)
     setParticipants([])
     async function load() {
-      const { data: roundRow } = await supabase.from('assessment_rounds').select('*').eq('id', rid).single()
+      const { data: roundRow } = await supabase.from('assessment_rounds').select(ROUND_COLUMNS).eq('id', rid).single()
       if (cancelled) return
       if (!roundRow) {
         setLoading(false)
@@ -43,7 +44,7 @@ export default function LiveDashboard() {
         loadStandardByVersionId(round.standard_version_id),
         round.scoring_mode === 'collaborative' ? fetchTeamScoresForRound(rid).then((rows) => rows.map(teamScoreToScore)) : fetchScoresForRound(rid),
         supabase.from('facilities').select('*').eq('id', round.facility_id).single(),
-        supabase.from('participants').select('*').eq('round_id', rid).order('joined_at'),
+        supabase.from('participants').select(PARTICIPANT_COLUMNS).eq('round_id', rid).order('joined_at'),
       ])
       if (cancelled) return
       setRound(round)
@@ -90,6 +91,22 @@ export default function LiveDashboard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundId, round?.scoring_mode])
+
+  // ตาราง participants / assessment_rounds อ่านได้บางคอลัมน์ (ซ่อน device_key, join_code)
+  // Realtime อาจไม่ส่งการเปลี่ยนแปลงของสองตารางนี้ จึงดึงซ้ำทุก 15 วินาทีเป็นทางสำรอง
+  useEffect(() => {
+    if (!roundId) return
+    const rid = roundId
+    const timer = setInterval(async () => {
+      const [{ data: roundRow }, { data: parts }] = await Promise.all([
+        supabase.from('assessment_rounds').select(ROUND_COLUMNS).eq('id', rid).maybeSingle(),
+        supabase.from('participants').select(PARTICIPANT_COLUMNS).eq('round_id', rid).order('joined_at'),
+      ])
+      if (roundRow) setRound(roundRow as unknown as AssessmentRound)
+      if (parts) setParticipants(parts as unknown as Participant[])
+    }, 15000)
+    return () => clearInterval(timer)
+  }, [roundId])
 
   useEffect(() => {
     if (!roundId) return

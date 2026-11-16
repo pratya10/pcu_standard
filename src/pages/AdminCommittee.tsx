@@ -25,7 +25,7 @@ export default function AdminCommittee() {
 
   async function load() {
     setLoading(true)
-    const { data, error } = await supabase.from('committee_members').select('*').order('name')
+    const { data, error } = await supabase.rpc('admin_committee_members')
     if (!error) setMembers(data as CommitteeMember[])
     setLoading(false)
   }

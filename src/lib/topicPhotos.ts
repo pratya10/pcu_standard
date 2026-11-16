@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient'
+import { getParticipantCredentials, rpcErrorMessage, unwrapRpc } from './participantSession'
 import type { TopicPhoto } from '../types'
 
 const BUCKET = 'pcu-standard-topic-evidence'
@@ -51,6 +52,23 @@ export function getTopicPhotoUrl(filePath: string): string {
   return data.publicUrl
 }
 
+const MIME_EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
+
+// ฐานข้อมูลรับเฉพาะชื่อไฟล์ที่ลงท้าย .jpg .jpeg .png .webp · ตั้งนามสกุลจากชนิดไฟล์จริงเมื่อชื่อไม่มี/ไม่ตรง
+function evidenceFileName(file: File): string {
+  const ext = MIME_EXT[file.type]
+  if (!ext) throw new Error('รองรับเฉพาะรูป JPG, PNG หรือ WEBP')
+  const base = file.name.replace(/\.[A-Za-z0-9]+$/, '').slice(0, 200) || 'photo'
+  return `${base}.${ext}`
+}
+
+function requireCredentials(roundId: string, participantId: string | null) {
+  const creds = getParticipantCredentials(roundId)
+  if (!creds || (participantId && creds.participantId !== participantId)) throw new Error(rpcErrorMessage('FORBIDDEN'))
+  return creds
+}
+
+// 1) RPC add_topic_photo สร้างแถวและออกชื่อไฟล์ 2) อัปโหลดไปที่ชื่อนั้น (ภายใน 1 ชั่วโมง) · อัปโหลดล้ม = ลบแถวทิ้ง
 export async function uploadTopicPhoto(params: {
   roundId: string
   topicId: string
@@ -62,60 +80,69 @@ export async function uploadTopicPhoto(params: {
   if (file.size > MAX_PHOTO_BYTES) {
     throw new Error('ไฟล์รูปภาพต้องมีขนาดไม่เกิน 30 MB')
   }
-  const ext = file.name.split('.').pop() || 'jpg'
-  const filePath = `${roundId}/${topicId}/${itemId}/${crypto.randomUUID()}.${ext}`
-
-  const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(filePath, file, {
-    contentType: file.type || 'image/jpeg',
+  const creds = requireCredentials(roundId, participantId)
+  const { data, error } = await supabase.rpc('add_topic_photo', {
+    p_join_code: creds.joinCode,
+    p_participant_id: creds.participantId,
+    p_device_key: creds.deviceKey,
+    p_topic_id: topicId,
+    p_file_name: evidenceFileName(file),
+    p_size_bytes: file.size,
+    p_item_id: itemId,
   })
-  if (uploadErr) throw uploadErr
+  const added = unwrapRpc<{ ok: boolean; id: string; file_path: string }>(data, error)
 
-  const { data, error } = await supabase
-    .from('topic_photos')
-    .insert({
-      round_id: roundId,
-      topic_id: topicId,
-      item_id: itemId,
-      uploaded_by: participantId,
-      file_path: filePath,
-      file_name: file.name,
-      size_bytes: file.size,
+  const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(added.file_path, file, {
+    contentType: file.type,
+  })
+  if (uploadErr) {
+    await supabase.rpc('delete_topic_photo', {
+      p_join_code: creds.joinCode,
+      p_participant_id: creds.participantId,
+      p_device_key: creds.deviceKey,
+      p_photo_id: added.id,
     })
-    .select()
-    .single()
-  if (error) throw error
-  return data as TopicPhoto
-}
-
-export async function deleteTopicPhoto(photo: TopicPhoto) {
-  await supabase.storage.from(BUCKET).remove([photo.file_path])
-  const { error } = await supabase.from('topic_photos').delete().eq('id', photo.id)
-  if (error) throw error
-}
-
-// Swaps the file behind an existing photo row in place (same id, same
-// position in the list) instead of delete-then-reupload, mirroring how a
-// comment is edited in place rather than removed and recreated.
-export async function replaceTopicPhoto(photo: TopicPhoto, file: File): Promise<TopicPhoto> {
-  if (file.size > MAX_PHOTO_BYTES) {
-    throw new Error('ไฟล์รูปภาพต้องมีขนาดไม่เกิน 30 MB')
+    throw uploadErr
   }
-  const ext = file.name.split('.').pop() || 'jpg'
-  const newPath = `${photo.round_id}/${photo.topic_id}/${photo.item_id}/${crypto.randomUUID()}.${ext}`
 
-  const { error: uploadErr } = await supabase.storage.from(BUCKET).upload(newPath, file, {
-    contentType: file.type || 'image/jpeg',
-  })
-  if (uploadErr) throw uploadErr
+  const { data: row, error: rowErr } = await supabase.from('topic_photos').select('*').eq('id', added.id).single()
+  if (rowErr) throw rowErr
+  return row as TopicPhoto
+}
 
-  const { data, error } = await supabase
-    .from('topic_photos')
-    .update({ file_path: newPath, file_name: file.name, size_bytes: file.size })
-    .eq('id', photo.id)
-    .select()
-    .single()
+// กรรมการลบได้เฉพาะรูปของตัวเองในรอบที่ยังไม่ปิด (RPC) · ผู้ดูแล (ล็อกอิน) ลบได้ทุกรูปผ่านตารางตามนโยบายผู้ดูแล
+// ไฟล์ใน Storage ลบได้เฉพาะผู้ดูแล · กรรมการลบแล้วไฟล์ค้างไว้ให้ผู้ดูแลเก็บกวาด
+export async function deleteTopicPhoto(photo: TopicPhoto) {
+  const creds = getParticipantCredentials(photo.round_id)
+  if (creds) {
+    const { data, error } = await supabase.rpc('delete_topic_photo', {
+      p_join_code: creds.joinCode,
+      p_participant_id: creds.participantId,
+      p_device_key: creds.deviceKey,
+      p_photo_id: photo.id,
+    })
+    if (error) throw error
+    if ((data as { ok?: boolean })?.ok) {
+      await supabase.storage.from(BUCKET).remove([photo.file_path])
+      return
+    }
+  }
+  const { data: rows, error } = await supabase.from('topic_photos').delete().eq('id', photo.id).select('id')
   if (error) throw error
-
+  if (!rows || rows.length === 0) throw new Error('ลบได้เฉพาะรูปที่ตนเองแนบ')
   await supabase.storage.from(BUCKET).remove([photo.file_path])
-  return data as TopicPhoto
+}
+
+// เปลี่ยนรูป = เพิ่มรูปใหม่แล้วลบรูปเดิม (ฐานข้อมูลไม่ให้กรรมการแก้ชื่อไฟล์ของแถวเดิม)
+export async function replaceTopicPhoto(photo: TopicPhoto, file: File): Promise<TopicPhoto> {
+  if (!photo.item_id) throw new Error('รูปนี้ไม่ได้ผูกกับรายการตรวจ')
+  const added = await uploadTopicPhoto({
+    roundId: photo.round_id,
+    topicId: photo.topic_id,
+    itemId: photo.item_id,
+    participantId: null,
+    file,
+  })
+  await deleteTopicPhoto(photo)
+  return added
 }
