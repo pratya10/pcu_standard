@@ -1,3 +1,4 @@
+import { ROUND_COLUMNS, PARTICIPANT_COLUMNS } from '../lib/pcuColumns'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { jsPDF } from 'jspdf'
@@ -139,7 +140,7 @@ export default function Report() {
     setPhotos([])
     setAuditLog([])
     async function load() {
-      const { data: roundRow } = await supabase.from('assessment_rounds').select('*').eq('id', rid).single()
+      const { data: roundRow } = await supabase.from('assessment_rounds').select(ROUND_COLUMNS).eq('id', rid).single()
       if (cancelled) return
       if (!roundRow) {
         setLoading(false)
@@ -150,7 +151,7 @@ export default function Report() {
         loadStandardByVersionId(round.standard_version_id),
         round.scoring_mode === 'collaborative' ? fetchTeamScoresForRound(rid).then((rows) => rows.map(teamScoreToScore)) : fetchScoresForRound(rid),
         supabase.from('facilities').select('*').eq('id', round.facility_id).single(),
-        supabase.from('participants').select('*').eq('round_id', rid).order('joined_at'),
+        supabase.from('participants').select(PARTICIPANT_COLUMNS).eq('round_id', rid).order('joined_at'),
         listRoundPhotos(rid),
         round.scoring_mode === 'collaborative' ? fetchTeamScoreAuditForRound(rid) : Promise.resolve([]),
       ])
@@ -244,7 +245,7 @@ export default function Report() {
           heightLeft -= pageHeight
         }
       }
-      pdf.save(`pcu-report-${round.join_code}-${mode}.pdf`)
+      pdf.save(`pcu-report-${round.join_code ?? round.id.slice(0, 8)}-${mode}.pdf`)
     } catch (err) {
       console.error('exportPdf failed', err)
       alert('สร้าง PDF ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง หากยังไม่สำเร็จ ลองใช้เครื่องคอมพิวเตอร์แทนมือถือ หรือดาวน์โหลดเป็น Word แทน')
@@ -294,7 +295,7 @@ export default function Report() {
         photosByTopicAndItem: includeComments ? photosByTopicAndItem : undefined,
       })
       const suffix = includeComments ? 'with-comments' : 'no-comments'
-      downloadBlob(blob, `pcu-report-${round.join_code}-${suffix}.docx`)
+      downloadBlob(blob, `pcu-report-${round.join_code ?? round.id.slice(0, 8)}-${suffix}.docx`)
     } finally {
       setExportingDocx(null)
     }
@@ -323,7 +324,7 @@ export default function Report() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `pcu-report-${round?.join_code ?? 'export'}.csv`
+    a.download = `pcu-report-${round?.join_code ?? round?.id.slice(0, 8) ?? 'export'}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }

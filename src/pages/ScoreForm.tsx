@@ -1,3 +1,4 @@
+import { ROUND_COLUMNS, PARTICIPANT_COLUMNS } from '../lib/pcuColumns'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
@@ -115,7 +116,7 @@ export default function ScoreForm() {
     setParticipants([])
     setError(null)
     async function load() {
-      const { data: roundRow, error: roundErr } = await supabase.from('assessment_rounds').select('*').eq('id', rid).single()
+      const { data: roundRow, error: roundErr } = await supabase.from('assessment_rounds').select(ROUND_COLUMNS).eq('id', rid).single()
       if (cancelled) return
       if (roundErr || !roundRow) {
         setError('ไม่พบรอบการประเมิน')
@@ -125,7 +126,7 @@ export default function ScoreForm() {
       const round = roundRow as AssessmentRound
       const [std, parts, { data: fac }] = await Promise.all([
         loadStandardByVersionId(round.standard_version_id),
-        supabase.from('participants').select('*').eq('round_id', rid).order('joined_at'),
+        supabase.from('participants').select(PARTICIPANT_COLUMNS).eq('round_id', rid).order('joined_at'),
         supabase.from('facilities').select('*').eq('id', round.facility_id).single(),
       ])
       if (cancelled) return
@@ -512,7 +513,7 @@ export default function ScoreForm() {
 
       <div className="mt-3 flex flex-col items-center gap-2 border-t border-slate-100 pt-3 text-center">
         <p className="text-xs font-semibold text-slate-400">ชวนกรรมการคนอื่นเข้าร่วม</p>
-        <p className="font-mono text-2xl font-bold tracking-widest text-slate-800">{round.join_code}</p>
+        <p className="font-mono text-2xl font-bold tracking-widest text-slate-800">{session?.joinCode ?? round.join_code}</p>
         <QRCodeSVG value={joinUrl} size={112} />
         <p className="text-[11px] text-slate-400">สแกนหรือใช้รหัสนี้ที่หน้า "เข้าร่วมรอบการประเมิน"</p>
       </div>

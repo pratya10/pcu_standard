@@ -1,3 +1,4 @@
+import { ROUND_COLUMNS, PARTICIPANT_COLUMNS, withJoinCodes } from '../lib/pcuColumns'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
@@ -34,13 +35,14 @@ export default function AdminRoundDetail() {
   async function load() {
     if (!roundId) return
     setLoading(true)
-    const { data: roundRow } = await supabase.from('assessment_rounds').select('*').eq('id', roundId).single()
+    const { data: roundRow } = await supabase.from('assessment_rounds').select(ROUND_COLUMNS).eq('id', roundId).single()
     if (roundRow) {
       const [{ data: fac }, { data: parts }] = await Promise.all([
         supabase.from('facilities').select('*').eq('id', roundRow.facility_id).single(),
-        supabase.from('participants').select('*').eq('round_id', roundId).order('joined_at'),
+        supabase.from('participants').select(PARTICIPANT_COLUMNS).eq('round_id', roundId).order('joined_at'),
       ])
-      setRound(roundRow as AssessmentRound)
+      const [withCode] = await withJoinCodes([roundRow as unknown as AssessmentRound])
+      setRound(withCode)
       setFacility((fac as Facility) ?? null)
       setParticipants((parts as Participant[]) ?? [])
     }
@@ -318,7 +320,7 @@ export default function AdminRoundDetail() {
               <p className="font-mono text-4xl font-bold tracking-widest text-slate-800">{round.join_code}</p>
               <button
                 onClick={() => {
-                  setEditCode(round.join_code)
+                  setEditCode(round.join_code ?? '')
                   setEditingCode(true)
                 }}
                 className="text-xs text-emerald-700 hover:underline"

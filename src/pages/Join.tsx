@@ -1,27 +1,15 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
-import { randomDeviceKey, saveParticipantSession } from '../lib/participantSession'
-import { searchCommitteeMembers, updateCommitteeMember } from '../lib/committeeSearch'
-import { useConfirm } from '../components/ConfirmProvider'
+import { deviceKeyForThisBrowser, saveParticipantSession, unwrapRpc } from '../lib/participantSession'
+import { searchCommitteeMembers } from '../lib/committeeSearch'
 import VersionFooter from '../components/VersionFooter'
 import BrandLogo from '../components/BrandLogo'
 import GuideLink from '../components/GuideLink'
 import type { CommitteeMember, ParticipantRole } from '../types'
 
-function DiffRow({ label, oldValue, newValue }: { label: string; oldValue: string; newValue: string }) {
-  return (
-    <div className="mb-4">
-      <p className="mb-1 text-base font-semibold text-slate-700">{label}</p>
-      <p className="text-lg text-red-600 line-through">{oldValue || '(ว่าง)'}</p>
-      <p className="text-lg font-bold text-emerald-700">→ {newValue || '(ว่าง)'}</p>
-    </div>
-  )
-}
-
 export default function Join() {
   const navigate = useNavigate()
-  const confirm = useConfirm()
   const [joinCode, setJoinCode] = useState('')
   const [name, setName] = useState('')
   const [civilServiceLevel, setCivilServiceLevel] = useState('')
@@ -77,12 +65,10 @@ export default function Join() {
     }
     setLoading(true)
     try {
-      const { data: round, error: roundErr } = await supabase
-        .from('assessment_rounds')
-        .select('id, name, status')
-        .eq('join_code', joinCode.trim().toUpperCase())
-        .maybeSingle()
-      if (roundErr) throw roundErr
+      const code = joinCode.trim().toUpperCase()
+      const { data: found, error: findErr } = await supabase.rpc('find_round', { p_join_code: code })
+      if (findErr) throw findErr
+      const round = (Array.isArray(found) ? found[0] : found) as { id: string; name: string; status: string } | undefined
       if (!round) {
         setError('ไม่พบรอบการประเมินสำหรับรหัสนี้')
         setLoading(false)
@@ -93,96 +79,39 @@ export default function Join() {
         setLoading(false)
         return
       }
-
-      // If the typed details now differ from a previously selected registry
-      // entry, ask whether to update that master record too.
-      if (selectedMember && role === 'evaluator') {
-        const oldLevel = selectedMember.civil_service_level ?? ''
-        const oldAffil = selectedMember.affiliation ?? ''
-        const newLevel = civilServiceLevel.trim()
-        const newAffil = affiliation.trim()
-        const nameChanged = name.trim() !== selectedMember.name
-        const levelChanged = newLevel !== oldLevel
-        const affilChanged = newAffil !== oldAffil
-        if (nameChanged || levelChanged || affilChanged) {
-          const shouldUpdate = await confirm({
-            title: 'ข้อมูลแตกต่างจากที่มีอยู่ในทะเบียน',
-            wide: true,
-            confirmLabel: 'อัปเดตข้อมูลเดิมด้วย',
-            cancelLabel: 'ไม่อัปเดต ใช้ครั้งนี้อย่างเดียว',
-            message: (
-              <div>
-                {nameChanged && <DiffRow label="ชื่อ-สกุล" oldValue={selectedMember.name} newValue={name.trim()} />}
-                {levelChanged && <DiffRow label="ระดับข้าราชการ / ตำแหน่ง" oldValue={oldLevel} newValue={newLevel} />}
-                {affilChanged && <DiffRow label="หน่วยงานที่สังกัด" oldValue={oldAffil} newValue={newAffil} />}
-              </div>
-            ),
-          })
-          if (shouldUpdate) {
-            await updateCommitteeMember(selectedMember.id, {
-              name: name.trim(),
-              civil_service_level: newLevel || null,
-              affiliation: newAffil || null,
-            })
-          }
-        }
+      // รอบที่ปิดแล้ว ผู้สังเกตการณ์ดูผลได้เลยโดยไม่ต้องลงชื่อเข้าร่วม
+      if (round.status === 'completed') {
+        navigate(`/round/${round.id}/live`)
+        return
       }
 
-      // Resume an existing participant row instead of creating a duplicate
-      // if this name already joined this round (e.g. they accidentally left
-      // — closed the tab, hit back, or exited — and are rejoining). This
-      // keeps their previously-entered scores intact.
+      // ทะเบียนกรรมการแก้ได้เฉพาะผู้ดูแล (หน้าแอดมิน > ทะเบียนกรรมการ) · ที่นี่ใช้ข้อมูลที่กรอกกับรอบนี้เท่านั้น
+      // เข้าร่วมผ่าน RPC join_round: เครื่องเดิม (กุญแจเครื่องเดิม) กลับเข้ามาได้ผู้เข้าร่วมคนเดิม คะแนนเดิมไม่หาย
       const trimmedName = name.trim()
-      const { data: existingRows, error: existingErr } = await supabase
-        .from('participants')
-        .select('*')
-        .eq('round_id', round.id)
-        .eq('role', role)
-        .ilike('name', trimmedName)
-        .order('joined_at', { ascending: false })
-        .limit(1)
-      if (existingErr) throw existingErr
-      const existing = existingRows?.[0] ?? null
+      const deviceKey = deviceKeyForThisBrowser()
+      const { data: joined, error: joinErr } = await supabase.rpc('join_round', {
+        p_join_code: code,
+        p_device_key: deviceKey,
+        p_name: trimmedName,
+        p_role: role,
+        p_civil_service_level: civilServiceLevel.trim() || null,
+        p_affiliation: affiliation.trim() || null,
+      })
+      const participant = unwrapRpc<{ ok: boolean; round_id: string; participant_id: string }>(joined, joinErr)
 
-      const deviceKey = randomDeviceKey()
-      let participant
-      if (existing) {
-        const { data: updated, error: updErr } = await supabase
-          .from('participants')
-          .update({
-            name: trimmedName,
-            device_key: deviceKey,
-            civil_service_level: civilServiceLevel.trim() || null,
-            affiliation: affiliation.trim() || null,
-          })
-          .eq('id', existing.id)
-          .select()
-          .single()
-        if (updErr) throw updErr
-        participant = updated
-      } else {
-        const { data: created, error: pErr } = await supabase
-          .from('participants')
-          .insert({
-            round_id: round.id,
-            name: trimmedName,
-            role,
-            device_key: deviceKey,
-            civil_service_level: civilServiceLevel.trim() || null,
-            affiliation: affiliation.trim() || null,
-          })
-          .select()
-          .single()
-        if (pErr) throw pErr
-        participant = created
-      }
-
-      saveParticipantSession({ participantId: participant.id, roundId: round.id, name: trimmedName, role })
+      saveParticipantSession({
+        participantId: participant.participant_id,
+        roundId: participant.round_id,
+        name: trimmedName,
+        role,
+        joinCode: code,
+        deviceKey,
+      })
 
       navigate(role === 'viewer' ? `/round/${round.id}/live` : `/round/${round.id}/score`)
     } catch (err) {
       console.error(err)
-      setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง')
+      setError(err instanceof Error && err.message ? err.message : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง')
     } finally {
       setLoading(false)
     }

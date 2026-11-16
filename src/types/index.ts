@@ -103,7 +103,8 @@ export type AssessmentRound = {
   standard_version_id: string
   name: string
   survey_date: string | null
-  join_code: string
+  /** ผู้ดูแลเท่านั้น (admin_round_join_codes) · คนทั่วไปไม่ได้ค่านี้ */
+  join_code?: string
   status: 'draft' | 'in_progress' | 'completed'
   is_public: boolean
   scoring_mode: ScoringMode
@@ -119,7 +120,8 @@ export type Participant = {
   round_id: string
   name: string
   role: ParticipantRole
-  device_key: string
+  /** ไม่ส่งออกจากฐานข้อมูล (เก็บไว้ในเครื่องของกรรมการ) */
+  device_key?: string
   civil_service_level: string | null
   affiliation: string | null
   joined_at: string
@@ -146,9 +148,10 @@ export type CommitteeMember = {
   civil_service_level: string | null
   affiliation: string | null
   position: string | null
-  phone: string | null
-  email: string | null
-  note: string | null
+  /** ผู้ดูแลเท่านั้น (admin_committee_members) */
+  phone?: string | null
+  email?: string | null
+  note?: string | null
   created_at: string
 }
 

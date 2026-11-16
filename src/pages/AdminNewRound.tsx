@@ -62,7 +62,7 @@ export default function AdminNewRound() {
           scoring_mode: scoringMode,
           created_by: user?.id ?? null,
         })
-        .select()
+        .select('id')
         .single()
       setSaving(false)
       if (error) {
@@ -87,7 +87,7 @@ export default function AdminNewRound() {
           scoring_mode: scoringMode,
           created_by: user?.id ?? null,
         })
-        .select()
+        .select('id')
         .single()
       if (!error) {
         navigate(`/admin/rounds/${data.id}`)
